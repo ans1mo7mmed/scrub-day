@@ -185,6 +185,14 @@
     }
   };
 
+  // حقوق التصميم — تظهر أسفل كل الصفحات
+  document.addEventListener("DOMContentLoaded", () => {
+    const f = document.createElement("footer");
+    f.className = "credit";
+    f.innerHTML = "© 2026 · تصميم وتطوير النظام: <b>محمد أسعد السعد</b>";
+    document.body.appendChild(f);
+  });
+
   window.API = { rpc, LIVE, cfg };
   window.U = U;
 })();

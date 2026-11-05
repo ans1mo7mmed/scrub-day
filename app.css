@@ -323,6 +323,33 @@ td .sub { display: block; color: var(--muted); font-size: 12px; }
 .links .lk { display: flex; gap: 8px; align-items: center; background: rgba(4, 12, 32, .5); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font-size: 13px; }
 .links .lk code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: left; color: var(--ice); }
 
+/* ---------- responsive fixes (all devices) ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(56px, env(safe-area-inset-bottom)); }
+.grid2 { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); }
+.grid2 > *, .card, .stat { min-width: 0; }
+.links .lk code { min-width: 0; }
+.links .lk.msg { align-items: flex-start; }
+.links .lk.msg code { white-space: pre-wrap; overflow: visible; word-break: break-word; direction: rtl; text-align: right; font-family: inherit; line-height: 1.7; }
+.topbar { flex-wrap: wrap; }
+.stat b { font-size: clamp(22px, 5vw, 28px); }
+td { word-break: break-word; }
+dialog { max-height: calc(100dvh - 32px); overflow: auto; }
+.cam { max-height: 62vh; max-height: 62dvh; margin: 0 auto; }
+.result { padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); overflow-y: auto; }
+.countdown { flex-wrap: wrap; }
+.credit { text-align: center; font-size: 12px; color: var(--dim); padding: 8px 16px max(20px, env(safe-area-inset-bottom)); letter-spacing: .02em; }
+.credit b { color: var(--muted); font-weight: 600; }
+.t-credit { font-size: 2cqw; letter-spacing: .12em; color: #5f78b0; direction: ltr; }
+@media (max-width: 380px) {
+  .hero h1 { font-size: 34px; }
+  .chip { font-size: 12px; padding: 6px 9px; }
+  .actions { grid-template-columns: 1fr; }
+  .stats { gap: 8px; }
+  .stat { padding: 12px; }
+  .row { flex-wrap: wrap; }
+}
+@media (min-width: 861px) and (max-width: 1100px) { .grid2 { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); } }
 @media (max-width: 860px) {
   .grid2 { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, 1fr); }

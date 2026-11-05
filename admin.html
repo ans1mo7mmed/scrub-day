@@ -187,7 +187,7 @@
     const base = location.href.replace(/admin\.html.*$/, "").replace(/[?#].*$/, "");
     const L = [["موقع الطلاب (انشره بالكروب)", base], ["الماسح (للمتطوعين فقط)", base + "scan.html"]];
     $("#links").innerHTML = L.map(([t, u]) => `<div><div class="muted small" style="margin-bottom:4px">${t}</div><div class="lk"><code>${U.esc(u)}</code><button class="btn ghost sm" data-copy="${U.esc(u)}">نسخ</button></div></div>`).join("") +
-      `<div><div class="muted small" style="margin-bottom:4px">رسالة جاهزة للكروب</div><div class="lk"><code style="direction:rtl;text-align:right">${U.esc(groupMsg(base))}</code><button class="btn ghost sm" data-copy="${U.esc(groupMsg(base))}">نسخ</button></div></div>`;
+      `<div><div class="muted small" style="margin-bottom:4px">رسالة جاهزة للكروب</div><div class="lk msg"><code style="direction:rtl;text-align:right">${U.esc(groupMsg(base))}</code><button class="btn ghost sm" data-copy="${U.esc(groupMsg(base))}">نسخ</button></div></div>`;
   }
   function groupMsg(base) {
     return `💙 تذاكر ${E.title} — ${E.batch}\n📅 ${E.dateText}\n📍 ${E.venue} – ${E.city}\n\nادخل الرابط، اختار اسمك، وتطلع لك تذكرتك فوراً:\n${base}\n\n⚠️ التذكرة شخصية وتنمسح مرة وحدة بس، لا تنطيها لأحد، وجيب هويتك الجامعية.\nتنظيم ${E.organizer}`;

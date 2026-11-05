@@ -84,6 +84,7 @@
   <div class="t-foot">
     <span class="t-org"><i>${esc(E.organizerLabel || "ORGANIZED BY")}</i> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 5 7l4.5 4L12 5l2.5 6L19 7l2 11z" fill="currentColor"/></svg> <b>${esc(E.organizer || "")}</b></span>
     <span class="t-admit">ADMIT ONE · تذكرة دخول شخصية</span>
+    <span class="t-credit">DESIGNED BY MOHAMMED ASAAD AL-SAAD</span>
   </div>
   <div class="t-shine"></div>
 </article>`;
