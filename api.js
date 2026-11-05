@@ -86,6 +86,18 @@
       if (!s) { log(null, "invalid", p_gate); save(); return { status: "invalid" }; }
       return doCheckin(s, p_gate, p_offline ? "offline" : "ok");
     },
+    peek_ticket: ({ p_token, p_pin, p_gate }) => {
+      if (!pin("scanner", p_pin)) return BAD;
+      const s = db.students.find(x => x.token && x.token === p_token);
+      if (!s) { log(null, "invalid", p_gate); save(); return { status: "invalid" }; }
+      const base = { id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title };
+      if (s.checked_in_at) { log(s, "used", p_gate); save(); return { status: "used", ...base, at: s.checked_in_at, by: s.checked_in_by, overrides: s.override_count }; }
+      return { status: "valid", ...base };
+    },
+    reject_entry: ({ p_id, p_pin, p_gate, p_reason }) => {
+      if (!pin("scanner", p_pin)) return BAD;
+      log(find(p_id) || null, "rejected", p_gate, (p_reason || "").trim() || "بدون سبب"); save(); return { status: "ok" };
+    },
     check_in_by_id: ({ p_id, p_pin, p_gate }) => {
       if (!pin("scanner", p_pin)) return BAD;
       const s = find(p_id); return s ? doCheckin(s, p_gate, "manual") : { status: "invalid" };

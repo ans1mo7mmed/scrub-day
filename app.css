@@ -252,6 +252,10 @@ dialog p { margin: 6px 0 18px; color: var(--muted); font-size: 14px; }
 .result .note { margin-top: 14px; font-size: 14px; background: rgba(0, 0, 0, .22); padding: 8px 14px; border-radius: 12px; }
 .result .btn { margin-top: 28px; min-width: 220px; background: #fff; color: #0a1a3f; box-shadow: none; font-size: 17px; padding: 15px 22px; }
 
+.result.verify { background: radial-gradient(circle at 50% 30%, #3b82f6, #12307a); }
+.result.rejected { background: radial-gradient(circle at 50% 30%, #b91c1c, #450a0a); }
+.result .btn.ok-btn { background: #22c55e; color: #fff; font-size: 17px; }
+.recent .rc.rejected i, .recent .rc.invalid i { background: #6b7280; }
 .result.override { background: radial-gradient(circle at 50% 30%, #f59e0b, #8a4b06); }
 .r-actions { display: grid; gap: 10px; margin-top: 26px; width: min(320px, 100%); }
 .result .r-actions .btn { margin: 0; width: 100%; min-width: 0; }
