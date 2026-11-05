@@ -45,10 +45,18 @@
 
   const CROSS = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" fill="currentColor"/></svg>`;
 
+  const KINDS = {
+    regular: { badge: "", who: "اسم الطالب", foot: "ADMIT ONE · تذكرة دخول شخصية" },
+    vip: { badge: "VIP", who: "اسم الضيف", foot: "VIP · شخصيات مهمة" },
+    vvip: { badge: "VVIP", who: "اسم الضيف", foot: "VVIP · دعوة خاصة" }
+  };
+
   function html(t) {
-    const esc = U.esc;
+    const esc = U.esc, k = KINDS[t.kind] || KINDS.regular, guest = t.kind && t.kind !== "regular";
+    const no = t.no || t.id;
     return `
-<article class="ticket" dir="rtl">
+<article class="ticket kind-${esc(t.kind || "regular")}" dir="rtl">
+  ${k.badge ? `<div class="t-vip">${k.badge}</div>` : ""}
   <div class="t-top">
     <div class="t-pattern"></div>
     <div class="t-head">
@@ -64,9 +72,9 @@
       <div class="t-art">${SCRUB}</div>
     </div>
     ${ECG}
-    <div class="t-name"><span>اسم الطالب</span><strong>${esc(t.name)}</strong></div>
+    <div class="t-name"><span>${k.who}</span><strong>${esc(t.name)}</strong>${t.title ? `<em class="t-title-role">${esc(t.title)}</em>` : ""}</div>
     <div class="t-grid">
-      <div><span>المرحلة</span><b>${esc(E.stage.replace("المرحلة ", ""))}</b></div>
+      ${guest ? `<div><span>نوع الدعوة</span><b>${k.badge}${t.kind === "vvip" ? " · خاصة جداً" : " · مهمة"}</b></div>` : `<div><span>المرحلة</span><b>${esc(E.stage.replace("المرحلة ", ""))}</b></div>`}
       <div><span>عدد التذاكر</span><b>${E.ticketsPerStudent} · تذكرة واحدة</b></div>
       <div><span>التاريخ</span><b>${esc(E.dateText)}${E.timeText ? " · " + esc(E.timeText) : ""}</b></div>
       <div><span>المكان</span><b>${esc(E.venue)} · ${esc(E.city)}</b></div>
@@ -76,14 +84,14 @@
   <div class="t-stub">
     <div class="t-qr">${qrSvg(E.qrPrefix + t.token)}</div>
     <div class="t-info">
-      <span>رقم التذكرة</span><b class="t-no">№ ${U.no(t.id)}</b>
+      <span>رقم التذكرة</span><b class="t-no">№ ${U.no(no)}</b>
       <span>ممثل الدفعة</span><b>${esc(E.rep)}</b>
       <small>صالحة لشخص واحد ولدخول مرة واحدة. يرجى إبراز الهوية الجامعية عند البوابة.</small>
     </div>
   </div>
   <div class="t-foot">
     <span class="t-org"><i>${esc(E.organizerLabel || "ORGANIZED BY")}</i> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 5 7l4.5 4L12 5l2.5 6L19 7l2 11z" fill="currentColor"/></svg> <b>${esc(E.organizer || "")}</b></span>
-    <span class="t-admit">ADMIT ONE · تذكرة دخول شخصية</span>
+    <span class="t-admit">${k.foot}</span>
     <span class="t-credit">DESIGNED BY MOHAMMED ASAAD AL-SAAD</span>
   </div>
   <div class="t-shine"></div>
@@ -100,7 +108,7 @@
     return htmlToImage.toPng(el, opts);
   }
 
-  function fileName(t) { return "تذكرة-حفلة-السكراب-" + U.no(t.id); }
+  function fileName(t) { return (t.kind && t.kind !== "regular" ? "دعوة-" + t.kind.toUpperCase() + "-" : "تذكرة-") + "حفلة-السكراب-" + U.no(t.no || t.id); }
 
   async function downloadPng(el, t) {
     const url = await toPng(el);
@@ -117,5 +125,5 @@
     pdf.save(fileName(t) + ".pdf");
   }
 
-  window.Ticket = { html, qrSvg, downloadPng, downloadPdf, SCRUB, CROSS };
+  window.Ticket = { html, qrSvg, downloadPng, downloadPdf, SCRUB, CROSS, KINDS };
 })();

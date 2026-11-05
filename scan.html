@@ -282,10 +282,10 @@
     const h = await U.sha256(token);
     const s = list.find(x => x.h === h);
     if (!s) return show({ status: "invalid" }, "مو موجودة بالنسخة المحفوظة (يمكن طلّعها بعد آخر تحديث) — جرّب البحث اليدوي بالاسم");
-    if (s.at) return show({ status: "used", id: s.id, name: s.full_name || s.name, at: s.at, by: s.by }, null, true);
+    if (s.at) return show({ status: "used", id: s.id, no: s.no, kind: s.k, name: s.name, at: s.at, by: s.by }, null, true);
     s.at = new Date().toISOString(); s.by = gate + " (أوفلاين)"; U.store.set(CACHE, list); updateCount();
     enqueue({ type: "scan", token, gate, id: s.id });
-    show({ status: "ok", id: s.id, name: s.name }, null, true);
+    show({ status: "ok", id: s.id, no: s.no, kind: s.k, name: s.name }, null, true);
   }
 
   // ---------- result screen ----------
@@ -312,7 +312,7 @@
     $("#rIc").innerHTML = ICONS[st];
     $("#rSt").textContent = { ok: "تذكرة صالحة ✓ تم تسجيل الدخول", used: "⚠️ التذكرة ممسوحة مسبقاً", override: "تم السماح بالدخول استثنائياً", invalid: "تذكرة غير صالحة" }[st];
     $("#rNm").textContent = r.name || "—";
-    $("#rMeta").textContent = r.id ? "رقم التذكرة № " + U.no(r.id) : "";
+    $("#rMeta").innerHTML = (r.id ? "رقم التذكرة № " + U.no(r.no || r.id) : "") + (r.kind && r.kind !== "regular" ? '<br><span class="kindbadge">' + r.kind.toUpperCase() + "</span>" : "");
     $("#rNote").textContent =
       st === "ok" ? "طابق الاسم مع الهوية الجامعية" + (offline ? " · (بدون انترنت — راح يتزامن)" : "") :
       st === "used" ? "دخل الساعة " + U.time(r.at) + (r.by ? " من " + r.by : "") + (r.overrides ? " · سماحات سابقة: " + r.overrides : "") :
@@ -339,7 +339,7 @@
   let ovTarget = null, ovReason = "";
   function openOverride(r) {
     ovTarget = r; ovReason = "";
-    $("#ovName").textContent = r.name + " · № " + U.no(r.id);
+    $("#ovName").textContent = r.name + " · № " + U.no(r.no || r.id);
     $("#ovOther").value = "";
     document.querySelectorAll("#reasons button").forEach(b => b.classList.remove("on"));
     $("#ovDlg").showModal();
@@ -361,7 +361,7 @@
         if (!(e instanceof U.NetError)) throw e;
         setOnline(false); enqueue({ type: "override", id: ovTarget.id, gate, reason });
         const s = list.find(x => x.id === ovTarget.id); if (s) { s.ov = (s.ov || 0) + 1; if (!s.at) { s.at = new Date().toISOString(); s.by = gate; } U.store.set(CACHE, list); }
-        r = { status: "override", id: ovTarget.id, name: ovTarget.name, offline: true };
+        r = { status: "override", id: ovTarget.id, no: ovTarget.no, name: ovTarget.name, offline: true };
       }
       $("#ovDlg").close();
       busy = true; show(r, null, r.offline); refresh();
@@ -373,16 +373,16 @@
   // ---------- manual ----------
   function renderManual() {
     const q = U.norm($("#mq").value);
-    const rows = (q ? list.filter(s => U.norm(s.name).includes(q) || U.no(s.id).includes(q)) : list).slice(0, 80);
+    const rows = (q ? list.filter(s => U.norm(s.name).includes(q) || U.no(s.no || s.id).includes(q)) : list).slice(0, 80);
     $("#mlist").innerHTML = rows.length ? rows.map(s => `
-      <li><div class="nm">${U.esc(s.name)}<small>№ ${U.no(s.id)}${s.at ? " · دخل " + U.time(s.at) + (s.by ? " · " + U.esc(s.by) : "") : ""}${s.ov ? " · استثناءات: " + s.ov : ""}</small></div>
+      <li><div class="nm">${U.esc(s.name)}<small>№ ${U.no(s.no || s.id)}${s.k && s.k !== "regular" ? " · " + s.k.toUpperCase() : ""}${s.at ? " · دخل " + U.time(s.at) + (s.by ? " · " + U.esc(s.by) : "") : ""}${s.ov ? " · استثناءات: " + s.ov : ""}</small></div>
       ${s.at ? `<button class="btn sm outline-warn" data-ov="${s.id}">سماح استثنائي</button>` : `<button class="btn sm" data-id="${s.id}">تسجيل دخول</button>`}</li>`).join("")
       : '<li class="empty" style="display:block">ماكو نتائج</li>';
   }
   $("#mq").addEventListener("input", renderManual);
   $("#mlist").addEventListener("click", async e => {
     const ov = e.target.closest("button[data-ov]");
-    if (ov) { const s = list.find(x => x.id === +ov.dataset.ov); return openOverride({ id: s.id, name: s.name }); }
+    if (ov) { const s = list.find(x => x.id === +ov.dataset.ov); return openOverride({ id: s.id, no: s.no, name: s.name }); }
     const b = e.target.closest("button[data-id]"); if (!b) return;
     const s = list.find(x => x.id === +b.dataset.id);
     if (!confirm("تسجيل دخول: " + s.name + "\nتأكدت من الهوية الجامعية؟")) return;
@@ -394,7 +394,7 @@
         if (!(err instanceof U.NetError)) throw err;
         setOnline(false); enqueue({ type: "manual", id: s.id, gate });
         s.at = new Date().toISOString(); s.by = gate + " (يدوي، أوفلاين)"; U.store.set(CACHE, list); updateCount();
-        r = { status: "ok", id: s.id, name: s.name, offline: true };
+        r = { status: "ok", id: s.id, no: s.no, kind: s.k, name: s.name, offline: true };
       }
       busy = true; show(r, null, r.offline); await refresh(); renderManual();
     } catch (err) { U.toast("صار خطأ", "bad"); b.disabled = false; }
