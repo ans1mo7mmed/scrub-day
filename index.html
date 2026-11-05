@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060f24">
+<title>حفلة السكراب · تذكرتك</title>
+<meta name="description" content="تذاكر حفلة السكراب — الدفعة الرابعة — تقنيات التخدير والعناية المركزة — جامعة الفرقدين الأهلية">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" crossorigin="anonymous">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="bg-fx"></div>
+
+<main class="wrap" id="pickView">
+  <header class="hero">
+    <div class="scrub" id="heroArt"></div>
+    <span class="pill" id="heroUni"></span>
+    <h1>حفلة <em>السكراب</em></h1>
+    <p class="en">SCRUB DAY · BATCH IV</p>
+    <div class="chips" id="chips"></div>
+    <p class="org-line" id="orgLine"></p>
+    <div class="countdown" id="countdown" hidden></div>
+  </header>
+
+  <section class="card">
+    <div class="closed-note" id="closedNote" hidden>إصدار التذاكر الجديدة مسدود حالياً. إذا طلّعت تذكرتك قبل، اختار اسمك وتطلع لك نفسها.</div>
+    <label class="label" for="q">دوّر على اسمك واختاره</label>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" class="input" placeholder="اكتب اسمك…" autocomplete="off" enterkeyhint="search">
+    </div>
+    <ul class="names" id="list"><li class="empty"><span class="spinner"></span></li></ul>
+    <p class="muted small" style="text-align:center;margin:14px 0 0">اسمك مو موجود؟ راجع ممثل الدفعة <b id="repName"></b></p>
+  </section>
+</main>
+
+<main class="wrap" id="ticketView" hidden>
+  <div class="stage"><div class="enter" id="enter"><div class="tilt" id="tilt"></div></div></div>
+  <div class="actions">
+    <button class="btn" id="pdfBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      تحميل PDF
+    </button>
+    <button class="btn ghost" id="pngBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+      حفظ صورة
+    </button>
+  </div>
+  <p class="hint">تكدر تسوي سكرين شوت هم. التذكرة تنمسح <b>مرة وحدة بس</b> بالبوابة، فلا تنطيها لأحد — واجلب هويتك الجامعية وياك.</p>
+  <button class="linkbtn" id="backBtn">مو اسمك؟ رجوع للقائمة</button>
+</main>
+
+<dialog id="confirm">
+  <div class="card">
+    <div class="av" style="margin:0 auto;width:56px;height:56px;border-radius:18px;font-size:22px" id="cAv"></div>
+    <h3 id="cName"></h3>
+    <p>تأكد إن هذا اسمك. التذكرة شخصية، وعند الدخول راح يتطابق الاسم مع هويتك الجامعية.</p>
+    <div class="row">
+      <button class="btn ghost" id="cNo">لا، رجوع</button>
+      <button class="btn" id="cYes">إي، هذا اسمي</button>
+    </div>
+  </div>
+</dialog>
+
+<canvas id="confetti"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="ticket.js"></script>
+<script>
+(function () {
+  const E = APP_CONFIG.EVENT, $ = s => document.querySelector(s);
+  U.demoBanner();
+  const ICON = {
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+    cap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>'
+  };
+  $("#heroArt").innerHTML = Ticket.SCRUB;
+  $("#heroUni").textContent = E.university + " · تقنيات التخدير والعناية المركزة";
+  $("#repName").textContent = E.rep;
+  if (E.organizer) $("#orgLine").innerHTML = U.esc(E.organizerLabel || "ORGANIZED BY") + " <b>" + U.esc(E.organizer) + "</b>";
+  $("#chips").innerHTML =
+    `<span class="chip">${ICON.cal}${U.esc(E.dateShort)}</span>` +
+    `<span class="chip">${ICON.pin}${U.esc(E.venue)} – ${U.esc(E.city)}</span>` +
+    `<span class="chip">${ICON.cap}${U.esc(E.batch)}</span>`;
+
+  // عدّاد تنازلي للحفلة
+  (function countdown() {
+    const target = new Date(E.startISO || "2026-11-27T16:00:00+03:00").getTime();
+    const el = $("#countdown");
+    function draw() {
+      const d = target - Date.now();
+      if (d <= 0) { el.hidden = false; el.innerHTML = "<b>اليوم الحفلة 🎉</b>"; return; }
+      const days = Math.floor(d / 864e5), h = Math.floor(d % 864e5 / 36e5), m = Math.floor(d % 36e5 / 6e4);
+      el.hidden = false;
+      el.innerHTML = [[days, "يوم"], [h, "ساعة"], [m, "دقيقة"]].map(([n, l]) => `<div><b>${n}</b><span>${l}</span></div>`).join("");
+    }
+    draw(); setInterval(draw, 30000);
+  })();
+
+  let students = [], picked = null, current = null;
+  const SAVE_KEY = "frq_my_ticket";
+
+  function renderList() {
+    const q = U.norm($("#q").value);
+    const rows = q ? students.filter(s => s._n.includes(q)) : students;
+    if (!students.length) { $("#list").innerHTML = '<li class="empty">القائمة فارغة حالياً</li>'; return; }
+    if (!rows.length) { $("#list").innerHTML = '<li class="empty">ما لكينا هذا الاسم. جرّب تكتب الاسم الأول بس.</li>'; return; }
+    $("#list").innerHTML = rows.map(s =>
+      `<li><button data-id="${s.id}"><span class="av">${U.esc(s.name.trim()[0] || "؟")}</span><span class="nm">${U.esc(s.name)}</span>` +
+      `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></li>`).join("");
+  }
+
+  async function loadList() {
+    try {
+      const r = await API.rpc("list_students");
+      students = (r.students || []).map(s => ({ ...s, _n: U.norm(s.name) }));
+      $("#closedNote").hidden = r.open !== false;
+      renderList();
+    } catch (e) {
+      $("#list").innerHTML = '<li class="empty">صار خطأ بالاتصال. تأكد من الانترنت وحدّث الصفحة.</li>';
+    }
+  }
+
+  $("#q").addEventListener("input", renderList);
+  $("#list").addEventListener("click", e => {
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    picked = students.find(s => s.id === +b.dataset.id);
+    $("#cName").textContent = picked.name;
+    $("#cAv").textContent = picked.name.trim()[0];
+    $("#confirm").showModal();
+  });
+  $("#cNo").onclick = () => $("#confirm").close();
+  $("#cYes").onclick = async () => {
+    const btn = $("#cYes"); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    askMotion();
+    try {
+      const r = await API.rpc("issue_ticket", { p_id: picked.id });
+      if (r.status === "closed") { $("#confirm").close(); return U.toast("إصدار التذاكر مسدود حالياً — راجع ممثل الدفعة", "bad"); }
+      if (r.status !== "ok") throw new Error(r.status);
+      $("#confirm").close();
+      U.store.set(SAVE_KEY, { id: r.id, name: r.name, token: r.token });
+      showTicket(r, true);
+    } catch (e) {
+      U.toast("ما گدرنا نطلّع التذكرة، حاول مرة ثانية", "bad");
+    } finally { btn.disabled = false; btn.textContent = "إي، هذا اسمي"; }
+  };
+
+  function showTicket(t, celebrate) {
+    current = t;
+    $("#tilt").innerHTML = Ticket.html(t);
+    const en = $("#enter"); en.classList.remove("enter"); void en.offsetWidth; en.classList.add("enter");
+    $("#pickView").hidden = true; $("#ticketView").hidden = false;
+    window.scrollTo(0, 0);
+    if (celebrate) setTimeout(confetti, 450);
+  }
+
+  $("#backBtn").onclick = () => {
+    U.store.del(SAVE_KEY); current = null;
+    $("#ticketView").hidden = true; $("#pickView").hidden = false; $("#q").value = ""; renderList();
+  };
+
+  async function exportWith(fn, btn) {
+    const label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    try { await fn($("#tilt .ticket"), current); U.toast("تم التحميل ✓", "ok"); }
+    catch (e) { console.error(e); U.toast("ما اشتغل التحميل — سوّي سكرين شوت بدالها", "bad"); }
+    finally { btn.disabled = false; btn.innerHTML = label; }
+  }
+  $("#pdfBtn").onclick = e => exportWith(Ticket.downloadPdf, e.currentTarget);
+  $("#pngBtn").onclick = e => exportWith(Ticket.downloadPng, e.currentTarget);
+
+  // ---------- 3D tilt ----------
+  const tilt = $("#tilt");
+  let tx = 0, ty = 0, cx = 0, cy = 0, lastInput = 0;
+  function setTarget(x, y) { tx = Math.max(-1, Math.min(1, x)); ty = Math.max(-1, Math.min(1, y)); lastInput = performance.now(); }
+  document.addEventListener("pointermove", e => {
+    if ($("#ticketView").hidden) return;
+    const r = tilt.getBoundingClientRect();
+    setTarget((e.clientX - (r.left + r.width / 2)) / (r.width / 1.4), (e.clientY - (r.top + r.height / 2)) / (r.height / 1.4));
+  });
+  function onOrient(e) {
+    if (e.gamma == null) return;
+    setTarget(e.gamma / 25, (e.beta - 45) / 25);
+  }
+  function askMotion() {
+    try {
+      if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) {
+        DeviceOrientationEvent.requestPermission().then(s => { if (s === "granted") addEventListener("deviceorientation", onOrient); }).catch(() => {});
+      }
+    } catch (e) {}
+  }
+  if (typeof DeviceOrientationEvent !== "undefined" && !DeviceOrientationEvent.requestPermission) addEventListener("deviceorientation", onOrient);
+  (function loop(t) {
+    if (performance.now() - lastInput > 2500) { tx = Math.sin(t / 1400) * .45; ty = Math.cos(t / 1900) * .3; }
+    cx += (tx - cx) * .08; cy += (ty - cy) * .08;
+    tilt.style.setProperty("--ry", (cx * 14).toFixed(2) + "deg");
+    tilt.style.setProperty("--rx", (-cy * 12).toFixed(2) + "deg");
+    const sh = tilt.querySelector(".t-shine");
+    if (sh) { sh.style.setProperty("--sx", (50 + cx * 45) + "%"); sh.style.setProperty("--sy", (50 + cy * 45) + "%"); }
+    requestAnimationFrame(loop);
+  })(0);
+
+  // ---------- confetti ----------
+  function confetti() {
+    const c = $("#confetti"), x = c.getContext("2d"), dpr = devicePixelRatio || 1;
+    c.width = innerWidth * dpr; c.height = innerHeight * dpr; x.scale(dpr, dpr);
+    const colors = ["#ffffff", "#9cc3ff", "#5b8cff", "#e8c27a", "#2a55b8"];
+    const P = Array.from({ length: 140 }, () => ({
+      x: innerWidth / 2 + (Math.random() - .5) * 80, y: innerHeight * .35,
+      vx: (Math.random() - .5) * 13, vy: -Math.random() * 13 - 4, s: Math.random() * 7 + 4,
+      r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: colors[Math.random() * colors.length | 0], plus: Math.random() < .25
+    }));
+    const t0 = performance.now();
+    (function f(t) {
+      x.clearRect(0, 0, innerWidth, innerHeight);
+      P.forEach(p => {
+        p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c;
+        if (p.plus) { const a = p.s / 3; x.fillRect(-a / 2, -p.s / 2, a, p.s); x.fillRect(-p.s / 2, -a / 2, p.s, a); }
+        else x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        x.restore();
+      });
+      if (t - t0 < 3200) requestAnimationFrame(f); else x.clearRect(0, 0, innerWidth, innerHeight);
+    })(t0);
+  }
+
+  // ---------- start ----------
+  (async function init() {
+    const saved = U.store.get(SAVE_KEY);
+    if (saved && saved.token) {
+      showTicket(saved, false);
+      try {
+        const r = await API.rpc("get_ticket", { p_token: saved.token });
+        if (r.status === "ok") { if (r.name !== saved.name) { U.store.set(SAVE_KEY, r); showTicket(r, false); } }
+        else { U.store.del(SAVE_KEY); $("#backBtn").click(); U.toast("تذكرتك القديمة انلغت، اختار اسمك مرة ثانية"); }
+      } catch (e) { /* بدون انترنت: نخلي التذكرة المحفوظة */ }
+    }
+    loadList();
+  })();
+})();
+</script>
+</body>
+</html>

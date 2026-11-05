@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060f24">
+<meta name="robots" content="noindex">
+<title>لوحة الإدارة · حفلة السكراب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="bg-fx"></div>
+
+<main class="wrap" id="loginView">
+  <div class="login">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></div>
+    <h1>لوحة الإدارة</h1>
+    <p class="muted small">ممثل الدفعة · حفلة السكراب · BASRA KING</p>
+    <form id="loginForm">
+      <input class="input" id="pin" type="password" placeholder="رمز الإدارة" autocomplete="current-password" required>
+      <button class="btn" type="submit">دخول</button>
+    </form>
+  </div>
+</main>
+
+<main class="wrap wide" id="adminView" hidden>
+  <div class="topbar">
+    <div><h1 style="font-size:22px">لوحة الإدارة</h1><div class="muted small">حفلة السكراب · <span id="evLine"></span> · <span class="netdot on" id="net"></span> <span id="upd"></span></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn ghost sm" id="csvBtn">تصدير Excel</button>
+      <button class="btn ghost sm" id="printBtn">طباعة كشف احتياطي</button>
+      <button class="btn ghost sm" id="logout">خروج</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span>الطلاب الدافعين</span><b id="sTotal">0</b></div>
+    <div class="stat b"><span>طلّعوا تذكرة</span><b id="sIssued">0</b></div>
+    <div class="stat g"><span>دخلوا الحفلة</span><b id="sIn">0</b></div>
+    <div class="stat w"><span>سماح استثنائي</span><b id="sOv">0</b></div>
+  </div>
+
+  <div class="tabs tabs3" id="mainTabs">
+    <button class="on" data-tab="students">الطلاب</button>
+    <button data-tab="log">سجل الدخول</button>
+    <button data-tab="settings">الإعدادات</button>
+  </div>
+
+  <!-- الطلاب -->
+  <div class="grid2" id="tab-students">
+    <div style="display:grid;gap:14px">
+      <section class="card">
+        <h2>إضافة أسماء الطلاب الدافعين</h2>
+        <textarea class="input" id="names" placeholder="الصق الأسماء هنا — كل اسم بسطر&#10;1- حسين عبد الجليل&#10;2- علي حسين كاظم&#10;…"></textarea>
+        <div class="muted small" id="parsed" style="margin:6px 0 10px">الترقيم بأول السطر يتشال تلقائياً، والأسماء المكررة تنتجاهل.</div>
+        <button class="btn" id="addBtn" style="width:100%">إضافة للقائمة</button>
+      </section>
+      <section class="card">
+        <h2>الروابط</h2>
+        <div class="links" id="links"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" class="input" placeholder="ابحث بالاسم أو رقم التذكرة…" autocomplete="off">
+      </div>
+      <div class="filters" id="filters">
+        <button class="on" data-f="all">الكل</button>
+        <button data-f="issued">طلّعوا تذكرة</button>
+        <button data-f="noticket">ما طلّعوا</button>
+        <button data-f="in">دخلوا</button>
+        <button data-f="out">ما دخلوا</button>
+        <button data-f="ov">استثناءات</button>
+      </div>
+      <table>
+        <thead><tr><th>№</th><th>الاسم</th><th>التذكرة</th><th>الدخول</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- السجل -->
+  <section class="card" id="tab-log" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">سجل كل عمليات المسح</h2>
+      <div class="filters" id="logFilters" style="margin:0">
+        <button class="on" data-f="all">الكل</button>
+        <button data-f="override">استثناءات</button>
+        <button data-f="used">مستخدمة مسبقاً</button>
+        <button data-f="invalid">غير صالحة</button>
+        <button data-f="manual">يدوي</button>
+      </div>
+    </div>
+    <ul class="plist" id="logList"></ul>
+  </section>
+
+  <!-- الإعدادات -->
+  <div class="grid2" id="tab-settings" hidden>
+    <section class="card">
+      <h2>إصدار التذاكر</h2>
+      <div class="switch-row">
+        <div><b id="openLbl">مفتوح</b><div class="muted small">إذا سدّيته، الطلاب اللي ما طلّعوا تذكرة ما يكدرون يطلّعون. اللي طلّعوا تبقى تذكرتهم شغالة.</div></div>
+        <button class="switch" id="openSw" role="switch" aria-checked="true"><i></i></button>
+      </div>
+      <hr class="sep">
+      <h2>تغيير رمز المتطوعين (الماسح)</h2>
+      <div class="row"><input class="input" id="newScan" placeholder="الرمز الجديد (6 أحرف أو أكثر)"><button class="btn sm" id="saveScan" style="flex:0 0 auto">حفظ</button></div>
+      <p class="muted small">المتطوعين المسجلين حالياً راح يطلبهم الماسح يدخلون الرمز الجديد.</p>
+      <hr class="sep">
+      <h2>تغيير رمز الإدارة</h2>
+      <div class="row"><input class="input" id="newAdmin" type="password" placeholder="الرمز الجديد (6 أحرف أو أكثر)"><button class="btn sm" id="saveAdmin" style="flex:0 0 auto">حفظ</button></div>
+    </section>
+    <section class="card">
+      <h2>بعد البروفة</h2>
+      <p class="muted small">يصفّر كل الدخولات والسجل حتى تبدون يوم الحفلة من الصفر. التذاكر والأسماء تبقى نفسها.</p>
+      <button class="btn danger" id="resetAll" style="width:100%">تصفير كل الدخولات</button>
+      <hr class="sep">
+      <h2>نصائح يوم الحفلة</h2>
+      <ul class="tips">
+        <li>كل متطوع يفتح الماسح ويسجل دخول <b>قبل</b> فتح الأبواب، حتى تنحفظ نسخة للعمل بدون انترنت.</li>
+        <li>إذا الانترنت انقطع، الماسح يكمل شغله ويزامن تلقائياً من يرجع.</li>
+        <li>السماح الاستثنائي يتسجل بالسبب واسم المتطوع، وتشوفه بسجل الدخول.</li>
+        <li>اطبع الكشف الاحتياطي واخليه عند البوابة.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
+  U.demoBanner();
+  const SESS = "frq_admin";
+  let pin = "", rows = [], logRows = [], filter = "all", logFilter = "all", isOpen = true, activeTab = "students";
+  $("#evLine").textContent = E.dateText + " · " + E.venue;
+  const RES = { ok: ["دخل", "in"], manual: ["يدوي", "iss"], offline: ["أوفلاين", "iss"], used: ["مستخدمة مسبقاً", "bad"], invalid: ["غير صالحة", "out"], override: ["سماح استثنائي", "warn"], undo: ["إلغاء دخول", "out"] };
+
+  async function call(fn, args) {
+    const r = await API.rpc(fn, Object.assign({ p_pin: pin }, args || {}));
+    if (r.status === "bad_pin") { U.store.del(SESS, sessionStorage); location.reload(); throw new Error("pin"); }
+    return r;
+  }
+  async function load() {
+    try {
+      const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false;
+      if (activeTab === "log") await loadLog();
+      $("#net").className = "netdot on"; $("#upd").textContent = "آخر تحديث " + U.time(new Date().toISOString());
+      render();
+    } catch (e) { $("#net").className = "netdot off"; }
+  }
+  async function loadLog() { const r = await call("admin_log", { p_limit: 500 }); logRows = r.log; renderLog(); }
+
+  $("#loginForm").onsubmit = async e => {
+    e.preventDefault();
+    const p = $("#pin").value.trim(), b = e.target.querySelector("button"); b.disabled = true;
+    try {
+      const r = await API.rpc("admin_list", { p_pin: p });
+      if (r.status !== "ok") return U.toast("الرمز غلط", "bad");
+      pin = p; U.store.set(SESS, p, sessionStorage); enter(r);
+    } catch (err) { U.toast("مشكلة بالاتصال", "bad"); }
+    finally { b.disabled = false; }
+  };
+  function enter(r) {
+    rows = r.students; isOpen = r.open !== false;
+    $("#loginView").hidden = true; $("#adminView").hidden = false; render(); renderLinks();
+    setInterval(load, 8000);
+  }
+  $("#logout").onclick = () => { U.store.del(SESS, sessionStorage); location.reload(); };
+
+  // ---------- tabs ----------
+  $("#mainTabs").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    activeTab = b.dataset.tab;
+    document.querySelectorAll("#mainTabs button").forEach(x => x.classList.toggle("on", x === b));
+    ["students", "log", "settings"].forEach(t => $("#tab-" + t).hidden = t !== activeTab);
+    if (activeTab === "log") loadLog().catch(() => {});
+  };
+
+  function renderLinks() {
+    const base = location.href.replace(/admin\.html.*$/, "").replace(/[?#].*$/, "");
+    const L = [["موقع الطلاب (انشره بالكروب)", base], ["الماسح (للمتطوعين فقط)", base + "scan.html"]];
+    $("#links").innerHTML = L.map(([t, u]) => `<div><div class="muted small" style="margin-bottom:4px">${t}</div><div class="lk"><code>${U.esc(u)}</code><button class="btn ghost sm" data-copy="${U.esc(u)}">نسخ</button></div></div>`).join("") +
+      `<div><div class="muted small" style="margin-bottom:4px">رسالة جاهزة للكروب</div><div class="lk"><code style="direction:rtl;text-align:right">${U.esc(groupMsg(base))}</code><button class="btn ghost sm" data-copy="${U.esc(groupMsg(base))}">نسخ</button></div></div>`;
+  }
+  function groupMsg(base) {
+    return `💙 تذاكر ${E.title} — ${E.batch}\n📅 ${E.dateText}\n📍 ${E.venue} – ${E.city}\n\nادخل الرابط، اختار اسمك، وتطلع لك تذكرتك فوراً:\n${base}\n\n⚠️ التذكرة شخصية وتنمسح مرة وحدة بس، لا تنطيها لأحد، وجيب هويتك الجامعية.\nتنظيم ${E.organizer}`;
+  }
+  $("#links").addEventListener("click", e => {
+    const b = e.target.closest("[data-copy]"); if (!b) return;
+    navigator.clipboard.writeText(b.dataset.copy).then(() => U.toast("انسخ ✓", "ok"), () => U.toast("ما انسخ"));
+  });
+
+  // ---------- import ----------
+  function parseNames(t) {
+    const seen = new Set(), out = [];
+    t.split(/\r?\n/).forEach(l => {
+      const n = l.replace(/^[\s\d٠-٩.\-–—)(:٫،•*_#]+/, "").replace(/[\s‏‎]+$/, "").replace(/\s+/g, " ").trim();
+      if (n.length >= 3 && !seen.has(n)) { seen.add(n); out.push(n); }
+    });
+    return out;
+  }
+  $("#names").addEventListener("input", () => {
+    const n = parseNames($("#names").value).length;
+    $("#parsed").textContent = n ? "راح يضاف " + n + " اسم (المكرر بالقائمة يتجاهل)" : "الترقيم بأول السطر يتشال تلقائياً، والأسماء المكررة تنتجاهل.";
+  });
+  $("#addBtn").onclick = async () => {
+    const names = parseNames($("#names").value);
+    if (!names.length) return U.toast("ماكو أسماء", "bad");
+    const b = $("#addBtn"); b.disabled = true;
+    try {
+      const r = await call("admin_add", { p_names: names });
+      U.toast("انضاف " + r.added + " اسم" + (r.skipped ? " · " + r.skipped + " موجودين مسبقاً" : ""), "ok");
+      $("#names").value = ""; $("#names").dispatchEvent(new Event("input")); await load();
+    } catch (e) { if (e.message !== "pin") U.toast("صار خطأ", "bad"); }
+    finally { b.disabled = false; }
+  };
+
+  // ---------- students table ----------
+  $("#q").addEventListener("input", render);
+  $("#filters").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    filter = b.dataset.f; document.querySelectorAll("#filters button").forEach(x => x.classList.toggle("on", x === b)); render();
+  });
+  function render() {
+    const total = rows.length, issued = rows.filter(r => r.issued_at).length, inn = rows.filter(r => r.at).length, ov = rows.reduce((a, r) => a + (r.ov || 0), 0);
+    $("#sTotal").textContent = total; $("#sIssued").textContent = issued; $("#sIn").textContent = inn; $("#sOv").textContent = ov;
+    $("#openSw").setAttribute("aria-checked", isOpen); $("#openLbl").textContent = isOpen ? "مفتوح — الطلاب يكدرون يطلّعون تذاكر" : "مسدود — ماكو إصدار تذاكر جديدة";
+    if (document.querySelector(".menu .pop:not([hidden])")) return; // لا تعيد الرسم والقائمة مفتوحة
+    const q = U.norm($("#q").value);
+    const list = rows.filter(r => {
+      if (filter === "issued" && !r.issued_at) return false;
+      if (filter === "noticket" && r.issued_at) return false;
+      if (filter === "in" && !r.at) return false;
+      if (filter === "out" && r.at) return false;
+      if (filter === "ov" && !r.ov) return false;
+      return !q || U.norm(r.name).includes(q) || U.no(r.id).includes(q);
+    }).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+    $("#tbody").innerHTML = list.length ? list.map(r => `
+      <tr>
+        <td class="no">№ ${U.no(r.id)}</td>
+        <td><b style="font-weight:600">${U.esc(r.name)}</b></td>
+        <td>${r.issued_at ? `<span class="tag iss">طلّعها</span><span class="sub">${U.dateTime(r.issued_at)} · فتحها ${r.open_count} مرة</span>` : '<span class="tag out">لسه</span>'}</td>
+        <td>${r.at ? `<span class="tag in">دخل ${U.time(r.at)}</span><span class="sub">${U.esc(r.by || "")}</span>` : '<span class="tag out">—</span>'}${r.ov ? ` <span class="tag warn">استثناء ×${r.ov}</span>` : ""}</td>
+        <td class="act"><div class="menu"><button data-menu="${r.id}" aria-label="خيارات">⋯</button>
+          <div class="pop" hidden>
+            <button data-act="rename" data-id="${r.id}">تعديل الاسم</button>
+            ${r.issued_at ? `<button data-act="reset" data-id="${r.id}">إلغاء الـQR وإصدار جديد</button>` : ""}
+            ${r.at ? `<button data-act="undo" data-id="${r.id}">إلغاء تسجيل الدخول</button>` : ""}
+            <button class="red" data-act="delete" data-id="${r.id}">حذف الطالب</button>
+          </div></div></td>
+      </tr>`).join("") : '<tr><td colspan="5" class="empty">ماكو نتائج</td></tr>';
+  }
+  document.addEventListener("click", async e => {
+    const m = e.target.closest("[data-menu]");
+    document.querySelectorAll(".menu .pop").forEach(p => { if (!m || p !== m.nextElementSibling) p.hidden = true; });
+    if (m) { m.nextElementSibling.hidden = !m.nextElementSibling.hidden; return; }
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    const id = +a.dataset.id, r = rows.find(x => x.id === id); if (!r) return;
+    try {
+      if (a.dataset.act === "rename") {
+        const n = prompt("الاسم الصحيح:", r.name); if (!n || n.trim() === r.name) return;
+        const res = await call("admin_rename", { p_id: id, p_name: n });
+        if (res.status === "duplicate") return U.toast("هذا الاسم موجود مسبقاً", "bad");
+        if (res.status === "short") return U.toast("الاسم قصير", "bad");
+      } else if (a.dataset.act === "reset") {
+        if (!confirm("إلغاء تذكرة " + r.name + "؟\nالـQR القديم راح يبطل، والطالب لازم يرجع يختار اسمه حتى تطلع له تذكرة جديدة.")) return;
+        await call("admin_reset_ticket", { p_id: id });
+      } else if (a.dataset.act === "undo") {
+        if (!confirm("إلغاء تسجيل دخول " + r.name + "؟")) return;
+        await call("admin_undo_checkin", { p_id: id });
+      } else if (a.dataset.act === "delete") {
+        if (!confirm("حذف " + r.name + " من القائمة نهائياً؟\nتذكرته راح تبطل.")) return;
+        await call("admin_delete", { p_id: id });
+      }
+      U.toast("تم ✓", "ok"); await load();
+    } catch (err) { if (err.message !== "pin") U.toast("صار خطأ", "bad"); }
+  });
+
+  // ---------- log ----------
+  $("#logFilters").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    logFilter = b.dataset.f; document.querySelectorAll("#logFilters button").forEach(x => x.classList.toggle("on", x === b)); renderLog();
+  });
+  function renderLog() {
+    const list = logRows.filter(l => logFilter === "all" || l.result === logFilter);
+    $("#logList").innerHTML = list.length ? list.map(l => {
+      const [t, c] = RES[l.result] || [l.result, "out"];
+      return `<li><div class="nm">${U.esc(l.name || "كود غير معروف")}${l.sid ? ` <span class="muted small">№ ${U.no(l.sid)}</span>` : ""}
+        <small>${U.dateTime(l.at)} · ${U.esc(l.gate || "")}${l.reason ? ` · <b style="color:#fde68a">السبب: ${U.esc(l.reason)}</b>` : ""}</small></div>
+        <span class="tag ${c}">${t}</span></li>`;
+    }).join("") : '<li class="empty" style="display:block">ماكو عمليات بعد</li>';
+  }
+
+  // ---------- settings ----------
+  $("#openSw").onclick = async () => {
+    const v = !isOpen;
+    if (!v && !confirm("تسد إصدار التذاكر؟ الطلاب اللي ما طلّعوا تذكرة ما يكدرون بعد.")) return;
+    await call("admin_set_setting", { p_key: "tickets_open", p_value: String(v) });
+    isOpen = v; render(); U.toast(v ? "انفتح الإصدار" : "انسد الإصدار", "ok");
+  };
+  async function savePin(key, input, after) {
+    const v = $(input).value.trim();
+    if (v.length < 6) return U.toast("الرمز لازم 6 أحرف أو أكثر", "bad");
+    if (!confirm("متأكد تغيّر الرمز إلى: " + (key === "admin_pin" ? "••••••" : v) + " ؟")) return;
+    const r = await call("admin_set_setting", { p_key: key, p_value: v });
+    if (r.status !== "ok") return U.toast("ما انحفظ", "bad");
+    $(input).value = ""; U.toast("انحفظ ✓", "ok"); if (after) after(v);
+  }
+  $("#saveScan").onclick = () => savePin("scanner_pin", "#newScan");
+  $("#saveAdmin").onclick = () => savePin("admin_pin", "#newAdmin", v => { pin = v; U.store.set(SESS, v, sessionStorage); });
+  $("#resetAll").onclick = async () => {
+    const w = prompt('هذا يصفّر كل الدخولات والسجل. للتأكيد اكتب: تصفير');
+    if (w !== "تصفير") return;
+    await call("admin_reset_checkins"); U.toast("تم التصفير ✓", "ok"); load();
+  };
+
+  // ---------- export / print ----------
+  $("#csvBtn").onclick = () => {
+    const head = ["رقم التذكرة", "الاسم", "طلّع التذكرة", "وقت الدخول", "البوابة / المتطوع", "سماح استثنائي"];
+    const lines = [head].concat(rows.map(r => [U.no(r.id), r.name, r.issued_at ? U.dateTime(r.issued_at) : "", r.at ? U.dateTime(r.at) : "", r.by || "", r.ov || 0]))
+      .map(l => l.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(","));
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "حضور-حفلة-السكراب.csv"; a.click();
+  };
+  $("#printBtn").onclick = () => {
+    const list = rows.slice().sort((a, b) => a.name.localeCompare(b.name, "ar"));
+    const w = window.open("", "_blank");
+    if (!w) return U.toast("المتصفح منع النافذة", "bad");
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف الحضور الاحتياطي</title>
+      <style>body{font-family:Tahoma,Arial,sans-serif;margin:24px;color:#000}h1{font-size:18px;margin:0}p{margin:4px 0 14px;font-size:12px}
+      table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}
+      td.c{width:70px;text-align:center}td.k{width:60px}</style></head><body>
+      <h1>كشف الحضور الاحتياطي — ${U.esc(E.title)} · ${U.esc(E.batch)}</h1>
+      <p>${U.esc(E.university)} · ${U.esc(E.dateText)} · ${U.esc(E.venue)} · تنظيم ${U.esc(E.organizer)} · العدد: ${list.length}</p>
+      <table><thead><tr><th>№</th><th>الاسم</th><th>دخل ✓</th><th>ملاحظة</th></tr></thead><tbody>
+      ${list.map(r => `<tr><td class="k">${U.no(r.id)}</td><td>${U.esc(r.name)}</td><td class="c">${r.at ? "✓" : ""}</td><td></td></tr>`).join("")}
+      </tbody></table><script>onload=()=>print()<\/script></body></html>`);
+    w.document.close();
+  };
+
+  const saved = U.store.get(SESS, sessionStorage);
+  if (saved) { pin = saved; API.rpc("admin_list", { p_pin: pin }).then(r => r.status === "ok" ? enter(r) : U.store.del(SESS, sessionStorage)).catch(() => {}); }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060f24">
+<meta name="robots" content="noindex">
+<title>ماسح التذاكر · المتطوعين</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="bg-fx"></div>
+
+<main class="wrap" id="loginView">
+  <div class="login">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg></div>
+    <h1>ماسح التذاكر</h1>
+    <p class="muted small">للمتطوعين فقط · حفلة السكراب · BASRA KING</p>
+    <form id="loginForm">
+      <input class="input" id="pin" type="password" placeholder="رمز المتطوعين" autocomplete="current-password" required>
+      <input class="input" id="gate" placeholder="اسمك + البوابة (مثلاً: علي – البوابة 1)" required maxlength="60">
+      <button class="btn" type="submit">دخول وتشغيل الكاميرا</button>
+    </form>
+  </div>
+</main>
+
+<main class="wrap" id="scanView" hidden>
+  <div class="topbar">
+    <div>
+      <h1>ماسح التذاكر</h1>
+      <div class="muted small"><span class="netdot" id="net"></span> <span id="gateLbl"></span></div>
+    </div>
+    <div class="counter"><div class="muted small">دخلوا</div><b id="cnt">0 / 0</b></div>
+  </div>
+  <div class="bar"><i id="barI"></i></div>
+  <div class="syncline" id="syncLine" hidden></div>
+  <div style="height:12px"></div>
+  <div class="tabs">
+    <button class="on" data-tab="cam">الكاميرا</button>
+    <button data-tab="manual">بحث يدوي</button>
+  </div>
+
+  <section id="tab-cam">
+    <div class="cam">
+      <video id="video" playsinline muted></video>
+      <div class="frame"></div>
+      <div class="laser"></div>
+      <button class="torch" id="torch" hidden aria-label="الفلاش">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10l-2 6H9z"/><path d="M9 8v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V8"/><path d="M12 12v3"/></svg>
+      </button>
+      <div class="cam-msg" id="camMsg"><div><span class="spinner"></span><p>جاري تشغيل الكاميرا…</p></div></div>
+    </div>
+    <div class="gate-line"><span>وجّه الكاميرا على الـQR بالتذكرة</span><button class="btn ghost sm" id="logout">خروج</button></div>
+    <div class="recent" id="recent"></div>
+  </section>
+
+  <section id="tab-manual" hidden>
+    <div class="card">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="mq" class="input" placeholder="ابحث باسم الطالب أو رقم التذكرة…" autocomplete="off">
+      </div>
+      <p class="muted small" style="margin:8px 0 0">للحالات الخاصة (موبايل طافي، تذكرة ما تنقرأ). تأكد من الهوية الجامعية قبل التسجيل.</p>
+      <ul class="plist" id="mlist"></ul>
+    </div>
+  </section>
+</main>
+
+<!-- شاشة النتيجة -->
+<div class="result" id="result" hidden>
+  <div class="ic" id="rIc"></div>
+  <div class="st" id="rSt"></div>
+  <div class="nm" id="rNm"></div>
+  <div class="meta" id="rMeta"></div>
+  <div class="note" id="rNote"></div>
+  <div class="r-actions">
+    <button class="btn" id="rNext">التالي</button>
+    <button class="btn outline" id="rOverride" hidden>السماح بالدخول استثنائياً</button>
+    <button class="btn outline" id="rManual" hidden>بحث يدوي بالاسم</button>
+  </div>
+</div>
+
+<!-- نافذة السماح الاستثنائي -->
+<dialog id="ovDlg">
+  <div class="card" style="text-align:start">
+    <h3 style="text-align:center">سماح استثنائي</h3>
+    <p style="text-align:center"><b id="ovName" style="color:var(--text)"></b><br>اختار السبب — يتسجل باسمك عند الإدارة.</p>
+    <div class="reasons" id="reasons">
+      <button type="button" data-r="نفس الطالب طلع ورجع">نفس الطالب طلع ورجع</button>
+      <button type="button" data-r="خطأ بالمسح الأول (ما دخل فعلاً)">خطأ بالمسح الأول</button>
+      <button type="button" data-r="تأكدت من الهوية — صاحب التذكرة نفسه">تأكدت من الهوية، هو صاحبها</button>
+      <button type="button" data-r="موافقة المنظم المسؤول">موافقة المنظم المسؤول</button>
+    </div>
+    <input class="input" id="ovOther" placeholder="أو اكتب سبب ثاني…" maxlength="150" style="margin-top:10px">
+    <div class="row" style="margin-top:16px">
+      <button class="btn ghost" id="ovCancel">إلغاء</button>
+      <button class="btn warn" id="ovOk">سماح بالدخول</button>
+    </div>
+  </div>
+</dialog>
+
+<canvas id="cv" hidden></canvas>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
+  U.demoBanner();
+  const SESS = "frq_scanner", CACHE = "frq_scan_cache", QUEUE = "frq_scan_queue";
+  let pin = "", gate = "", list = U.store.get(CACHE) || [], stream = null, track = null, scanning = false, busy = false;
+  let lastCode = "", lastAt = 0, detector = null, current = null, online = true, recent = [];
+  let queue = U.store.get(QUEUE) || [];
+
+  const ICONS = {
+    ok: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+    used: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>',
+    invalid: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    override: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>'
+  };
+  const LABEL = { ok: "دخل", manual: "يدوي", used: "مستخدمة", invalid: "غير صالحة", override: "استثناء", offline: "أوفلاين" };
+
+  // ---------- login ----------
+  async function login(p, g, silent) {
+    let r;
+    try { r = await API.rpc("scanner_list", { p_pin: p }); }
+    catch (e) {
+      // بدون انترنت: إذا نفس الرمز مسجل قبل، كمّل بالنسخة المحفوظة
+      const s = U.store.get("frq_last_pin");
+      if (s && s.h === await U.sha256(p) && list.length) { r = { status: "ok", students: list, cached: true }; }
+      else { U.toast("ماكو انترنت ولا نسخة محفوظة", "bad"); return false; }
+    }
+    if (r.status !== "ok") { if (!silent) U.toast("الرمز غلط", "bad"); U.store.del(SESS, sessionStorage); return false; }
+    pin = p; gate = g; setList(r.students);
+    U.store.set(SESS, { pin, gate }, sessionStorage); U.store.set("frq_last_pin", { h: await U.sha256(p) });
+    $("#gateLbl").textContent = gate;
+    $("#loginView").hidden = true; $("#scanView").hidden = false;
+    setOnline(!r.cached); startCam(); keepAwake();
+    setInterval(refresh, 12000); setInterval(sync, 6000);
+    return true;
+  }
+  $("#loginForm").onsubmit = async e => {
+    e.preventDefault();
+    const b = e.target.querySelector("button"); b.disabled = true;
+    try { await login($("#pin").value.trim(), $("#gate").value.trim()); }
+    finally { b.disabled = false; }
+  };
+  $("#logout").onclick = () => {
+    if (queue.length && !confirm("عندك " + queue.length + " عملية ما تزامنت بعد. تطلع؟ (راح تتزامن من ترجع تدخل)")) return;
+    U.store.del(SESS, sessionStorage); location.reload();
+  };
+
+  function setList(students) {
+    // نحافظ على الدخولات المحلية اللي بعدها بالطابور
+    const pendingIds = new Set(queue.map(q => q.id).filter(Boolean));
+    const old = new Map(list.map(s => [s.id, s]));
+    list = students.map(s => (!s.at && pendingIds.has(s.id) && old.get(s.id)?.at) ? { ...s, at: old.get(s.id).at, by: old.get(s.id).by } : s);
+    U.store.set(CACHE, list); updateCount();
+  }
+  async function refresh() {
+    try {
+      const r = await API.rpc("scanner_list", { p_pin: pin });
+      if (r.status === "ok") { setList(r.students); setOnline(true); if (!$("#tab-manual").hidden) renderManual(); }
+    } catch (e) { if (e instanceof U.NetError) setOnline(false); }
+  }
+  function updateCount() {
+    const inn = list.filter(s => s.at).length;
+    $("#cnt").textContent = inn + " / " + list.length;
+    $("#barI").style.width = (list.length ? inn / list.length * 100 : 0) + "%";
+  }
+  function setOnline(v) {
+    online = v;
+    $("#net").className = "netdot " + (v ? "on" : "off");
+    $("#net").title = v ? "متصل" : "بدون انترنت";
+    const sl = $("#syncLine");
+    if (!v || queue.length) {
+      sl.hidden = false;
+      sl.className = "syncline " + (v ? "" : "off");
+      sl.textContent = (v ? "جاري المزامنة… " : "بدون انترنت — الماسح شغّال بالنسخة المحفوظة. ") + (queue.length ? "بانتظار المزامنة: " + queue.length : "");
+    } else sl.hidden = true;
+  }
+
+  // ---------- offline queue ----------
+  function enqueue(item) { queue.push(item); U.store.set(QUEUE, queue); setOnline(online); }
+  let syncing = false;
+  async function sync() {
+    if (syncing || !queue.length) return;
+    syncing = true;
+    try {
+      while (queue.length) {
+        const q = queue[0]; let r;
+        if (q.type === "scan") r = await API.rpc("check_in", { p_token: q.token, p_pin: pin, p_gate: q.gate, p_offline: true });
+        else if (q.type === "manual") r = await API.rpc("check_in_by_id", { p_id: q.id, p_pin: pin, p_gate: q.gate });
+        else if (q.type === "override") r = await API.rpc("override_entry", { p_id: q.id, p_pin: pin, p_gate: q.gate, p_reason: q.reason });
+        if (r && r.status === "bad_pin") break;
+        if (r && r.status === "used" && q.type !== "override") U.toast("تنبيه: " + (r.name || "") + " كان داخل من " + (r.by || "بوابة ثانية") + " قبل المزامنة", "bad");
+        queue.shift(); U.store.set(QUEUE, queue);
+      }
+      setOnline(true); refresh();
+    } catch (e) { if (e instanceof U.NetError) setOnline(false); }
+    finally { syncing = false; }
+  }
+  addEventListener("online", () => { sync(); refresh(); });
+  addEventListener("offline", () => setOnline(false));
+
+  // ---------- tabs ----------
+  function tab(name) {
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === name));
+    const cam = name === "cam";
+    $("#tab-cam").hidden = !cam; $("#tab-manual").hidden = cam;
+    scanning = cam && !!stream;
+    if (cam) { if (!stream) startCam(); else requestAnimationFrame(tick); } else { renderManual(); }
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => tab(b.dataset.tab));
+
+  // ---------- camera ----------
+  async function startCam() {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("nocam");
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      const v = $("#video"); v.srcObject = stream; await v.play();
+      track = stream.getVideoTracks()[0];
+      try { if (track.getCapabilities && track.getCapabilities().torch) $("#torch").hidden = false; } catch (e) {}
+      $("#camMsg").hidden = true;
+      if ("BarcodeDetector" in window) { try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch (e) { detector = null; } }
+      scanning = !$("#tab-cam").hidden; requestAnimationFrame(tick);
+    } catch (e) {
+      $("#camMsg").innerHTML = '<div><p>ما گدرنا نشغل الكاميرا.</p><p class="small">اسمح للموقع باستخدام الكاميرا من إعدادات المتصفح، وتأكد إن الرابط يبدأ بـ https. وتكدر تستخدم البحث اليدوي.</p><button class="btn sm" onclick="location.reload()">إعادة المحاولة</button></div>';
+    }
+  }
+  let torchOn = false;
+  $("#torch").onclick = async () => {
+    try { torchOn = !torchOn; await track.applyConstraints({ advanced: [{ torch: torchOn }] }); $("#torch").classList.toggle("on", torchOn); }
+    catch (e) { U.toast("الفلاش ما مدعوم بهذا الجهاز"); }
+  };
+  let wake = null;
+  async function keepAwake() { try { wake = await navigator.wakeLock.request("screen"); } catch (e) {} }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && $("#loginView").hidden) keepAwake(); });
+
+  const cv = $("#cv"), cx = cv.getContext("2d", { willReadFrequently: true });
+  let lastTick = 0;
+  async function tick(t) {
+    if (!scanning) return;
+    requestAnimationFrame(tick);
+    if (busy || t - lastTick < 140) return;
+    lastTick = t;
+    const v = $("#video"); if (v.readyState < 2) return;
+    let code = null;
+    try {
+      if (detector) { const r = await detector.detect(v); if (r.length) code = r[0].rawValue; }
+      else {
+        const w = 640, h = Math.round(v.videoHeight / v.videoWidth * w) || 480;
+        cv.width = w; cv.height = h; cx.drawImage(v, 0, 0, w, h);
+        const r = jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+        if (r) code = r.data;
+      }
+    } catch (e) {}
+    if (code) onCode(code);
+  }
+
+  async function onCode(code) {
+    const now = Date.now();
+    if (busy || (code === lastCode && now - lastAt < 4000)) return;
+    lastCode = code; lastAt = now; busy = true;
+    if (!code.startsWith(E.qrPrefix)) return show({ status: "invalid" }, "هذا الكود مو تذكرة الحفلة");
+    const token = code.slice(E.qrPrefix.length);
+    try {
+      const r = await API.rpc("check_in", { p_token: token, p_pin: pin, p_gate: gate });
+      if (r.status === "bad_pin") { U.toast("الرمز تغيّر، سجل دخول مرة ثانية", "bad"); setTimeout(() => { U.store.del(SESS, sessionStorage); location.reload(); }, 1400); return; }
+      setOnline(true); show(r); refresh();
+    } catch (e) {
+      if (!(e instanceof U.NetError)) { busy = false; lastCode = ""; return U.toast("خطأ بالسيرفر، حاول مرة ثانية", "bad"); }
+      setOnline(false);
+      offlineScan(token);
+    }
+  }
+
+  async function offlineScan(token) {
+    const h = await U.sha256(token);
+    const s = list.find(x => x.h === h);
+    if (!s) return show({ status: "invalid" }, "مو موجودة بالنسخة المحفوظة (يمكن طلّعها بعد آخر تحديث) — جرّب البحث اليدوي بالاسم");
+    if (s.at) return show({ status: "used", id: s.id, name: s.full_name || s.name, at: s.at, by: s.by }, null, true);
+    s.at = new Date().toISOString(); s.by = gate + " (أوفلاين)"; U.store.set(CACHE, list); updateCount();
+    enqueue({ type: "scan", token, gate, id: s.id });
+    show({ status: "ok", id: s.id, name: s.name }, null, true);
+  }
+
+  // ---------- result screen ----------
+  let audio;
+  function beep(kind) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const seq = kind === "ok" ? [[880, 0], [1320, .12]] : kind === "override" ? [[660, 0], [880, .12]] : [[240, 0], [200, .18]];
+      seq.forEach(([f, d]) => {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = f; o.type = kind === "ok" || kind === "override" ? "sine" : "square";
+        g.gain.setValueAtTime(.0001, audio.currentTime + d);
+        g.gain.exponentialRampToValueAtTime(.25, audio.currentTime + d + .02);
+        g.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + d + .3);
+        o.connect(g).connect(audio.destination); o.start(audio.currentTime + d); o.stop(audio.currentTime + d + .35);
+      });
+    } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate(kind === "ok" ? 120 : [200, 80, 200]); } catch (e) {}
+  }
+  function show(r, why, offline) {
+    const st = ["ok", "used", "override"].includes(r.status) ? r.status : "invalid";
+    current = r;
+    $("#result").className = "result " + st;
+    $("#rIc").innerHTML = ICONS[st];
+    $("#rSt").textContent = { ok: "تذكرة صالحة ✓ تم تسجيل الدخول", used: "⚠️ التذكرة ممسوحة مسبقاً", override: "تم السماح بالدخول استثنائياً", invalid: "تذكرة غير صالحة" }[st];
+    $("#rNm").textContent = r.name || "—";
+    $("#rMeta").textContent = r.id ? "رقم التذكرة № " + U.no(r.id) : "";
+    $("#rNote").textContent =
+      st === "ok" ? "طابق الاسم مع الهوية الجامعية" + (offline ? " · (بدون انترنت — راح يتزامن)" : "") :
+      st === "used" ? "دخل الساعة " + U.time(r.at) + (r.by ? " من " + r.by : "") + (r.overrides ? " · سماحات سابقة: " + r.overrides : "") :
+      st === "override" ? "انسجل كاستثناء باسمك" + (offline ? " (راح يتزامن)" : "") :
+      (why || "هذا الكود مو موجود بالنظام أو انلغى");
+    $("#rOverride").hidden = st !== "used";
+    $("#rManual").hidden = st !== "invalid";
+    $("#result").hidden = false;
+    beep(st === "ok" ? "ok" : st === "override" ? "override" : "bad");
+    pushRecent(r.name || "كود غير صالح", st);
+  }
+  function closeResult() { $("#result").hidden = true; busy = false; }
+  $("#rNext").onclick = closeResult;
+  $("#rManual").onclick = () => { closeResult(); tab("manual"); $("#mq").focus(); };
+  $("#rOverride").onclick = () => openOverride(current);
+
+  function pushRecent(name, st) {
+    recent.unshift({ name, st, at: new Date().toISOString() }); recent = recent.slice(0, 6);
+    $("#recent").innerHTML = '<div class="muted small" style="margin:14px 0 6px">آخر عمليات المسح</div>' + recent.map(x =>
+      `<div class="rc ${x.st}"><i></i><span>${U.esc(x.name)}</span><small>${LABEL[x.st] || ""} · ${U.time(x.at)}</small></div>`).join("");
+  }
+
+  // ---------- override ----------
+  let ovTarget = null, ovReason = "";
+  function openOverride(r) {
+    ovTarget = r; ovReason = "";
+    $("#ovName").textContent = r.name + " · № " + U.no(r.id);
+    $("#ovOther").value = "";
+    document.querySelectorAll("#reasons button").forEach(b => b.classList.remove("on"));
+    $("#ovDlg").showModal();
+  }
+  $("#reasons").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    ovReason = b.dataset.r;
+    document.querySelectorAll("#reasons button").forEach(x => x.classList.toggle("on", x === b));
+  };
+  $("#ovCancel").onclick = () => $("#ovDlg").close();
+  $("#ovOk").onclick = async () => {
+    const reason = $("#ovOther").value.trim() || ovReason;
+    if (!reason) return U.toast("اختار سبب", "bad");
+    const b = $("#ovOk"); b.disabled = true;
+    try {
+      let r;
+      try { r = await API.rpc("override_entry", { p_id: ovTarget.id, p_pin: pin, p_gate: gate, p_reason: reason }); setOnline(true); }
+      catch (e) {
+        if (!(e instanceof U.NetError)) throw e;
+        setOnline(false); enqueue({ type: "override", id: ovTarget.id, gate, reason });
+        const s = list.find(x => x.id === ovTarget.id); if (s) { s.ov = (s.ov || 0) + 1; if (!s.at) { s.at = new Date().toISOString(); s.by = gate; } U.store.set(CACHE, list); }
+        r = { status: "override", id: ovTarget.id, name: ovTarget.name, offline: true };
+      }
+      $("#ovDlg").close();
+      busy = true; show(r, null, r.offline); refresh();
+      if (!$("#tab-manual").hidden) renderManual();
+    } catch (e) { U.toast("صار خطأ", "bad"); }
+    finally { b.disabled = false; }
+  };
+
+  // ---------- manual ----------
+  function renderManual() {
+    const q = U.norm($("#mq").value);
+    const rows = (q ? list.filter(s => U.norm(s.name).includes(q) || U.no(s.id).includes(q)) : list).slice(0, 80);
+    $("#mlist").innerHTML = rows.length ? rows.map(s => `
+      <li><div class="nm">${U.esc(s.name)}<small>№ ${U.no(s.id)}${s.at ? " · دخل " + U.time(s.at) + (s.by ? " · " + U.esc(s.by) : "") : ""}${s.ov ? " · استثناءات: " + s.ov : ""}</small></div>
+      ${s.at ? `<button class="btn sm outline-warn" data-ov="${s.id}">سماح استثنائي</button>` : `<button class="btn sm" data-id="${s.id}">تسجيل دخول</button>`}</li>`).join("")
+      : '<li class="empty" style="display:block">ماكو نتائج</li>';
+  }
+  $("#mq").addEventListener("input", renderManual);
+  $("#mlist").addEventListener("click", async e => {
+    const ov = e.target.closest("button[data-ov]");
+    if (ov) { const s = list.find(x => x.id === +ov.dataset.ov); return openOverride({ id: s.id, name: s.name }); }
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    const s = list.find(x => x.id === +b.dataset.id);
+    if (!confirm("تسجيل دخول: " + s.name + "\nتأكدت من الهوية الجامعية؟")) return;
+    b.disabled = true;
+    try {
+      let r;
+      try { r = await API.rpc("check_in_by_id", { p_id: s.id, p_pin: pin, p_gate: gate }); setOnline(true); }
+      catch (err) {
+        if (!(err instanceof U.NetError)) throw err;
+        setOnline(false); enqueue({ type: "manual", id: s.id, gate });
+        s.at = new Date().toISOString(); s.by = gate + " (يدوي، أوفلاين)"; U.store.set(CACHE, list); updateCount();
+        r = { status: "ok", id: s.id, name: s.name, offline: true };
+      }
+      busy = true; show(r, null, r.offline); await refresh(); renderManual();
+    } catch (err) { U.toast("صار خطأ", "bad"); b.disabled = false; }
+  });
+
+  // ---------- resume ----------
+  const s = U.store.get(SESS, sessionStorage);
+  if (s && s.pin) { $("#pin").value = s.pin; $("#gate").value = s.gate || ""; login(s.pin, s.gate, true); }
+  else { const g = U.store.get("frq_gate"); if (g) $("#gate").value = g; }
+  $("#gate").addEventListener("change", e => U.store.set("frq_gate", e.target.value));
+  updateCount();
+})();
+</script>
+</body>
+</html>
