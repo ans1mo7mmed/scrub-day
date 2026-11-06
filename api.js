@@ -171,6 +171,18 @@
     admin_log_delete: ({ p_pin, p_log_id }) => { if (!pin("admin", p_pin)) return BAD; db.log = db.log.filter(l => l.id !== p_log_id); save(); return { status: "ok" }; },
     admin_log_clear: ({ p_pin }) => { if (!pin("admin", p_pin)) return BAD; db.log = []; save(); return { status: "ok" }; },
     admin_log_add: ({ p_pin, p_sid, p_result, p_reason }) => { if (!pin("admin", p_pin)) return BAD; log(find(p_sid) || null, p_result, "الإدارة", (p_reason || "").trim() || null); save(); return { status: "ok" }; },
+    admin_export: ({ p_pin }) => {
+      if (!pin("admin", p_pin)) return BAD;
+      return { status: "ok", app: "scrub-day", version: 1, exported_at: now(), tickets_open: db.settings.tickets_open, students: db.students, log: db.log };
+    },
+    admin_import: ({ p_pin, p_data }) => {
+      if (!pin("admin", p_pin)) return BAD;
+      if (!p_data || p_data.app !== "scrub-day" || !Array.isArray(p_data.students)) return { status: "bad_file" };
+      db.students = p_data.students; db.log = p_data.log || [];
+      db.seq = Math.max(0, ...db.students.map(s => s.id)); db.lseq = Math.max(0, ...db.log.map(l => l.id));
+      if (p_data.tickets_open) db.settings.tickets_open = p_data.tickets_open;
+      save(); return { status: "ok", students: db.students.length, log: db.log.length };
+    },
     admin_delete_all: ({ p_pin }) => { if (!pin("admin", p_pin)) return BAD; db.students = []; db.log = []; save(); return { status: "ok" }; },
     admin_log: ({ p_pin, p_limit }) => {
       if (!pin("admin", p_pin)) return BAD;

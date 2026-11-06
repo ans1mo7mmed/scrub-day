@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=9">
+<link rel="stylesheet" href="app.css?v=10">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -36,6 +36,7 @@
     </div>
   </div>
 
+  <div class="bk-banner" id="bkBanner" hidden>⚠️ <b>ما عندك نسخة احتياطية حديثة.</b> نزّل وحدة هسه واحفظها بمكان آمن. <button class="btn sm" id="bkBannerBtn">تنزيل نسخة الآن</button></div>
   <div class="stats">
     <div class="stat"><span>الطلاب الدافعين</span><b id="sTotal">0</b></div>
     <div class="stat b"><span>طلّعوا تذكرة</span><b id="sIssued">0</b></div>
@@ -160,6 +161,17 @@
       <div class="row"><input class="input" id="newAdmin" type="password" placeholder="الرمز الجديد (6 أحرف أو أكثر)"><button class="btn sm" id="saveAdmin" style="flex:0 0 auto">حفظ</button></div>
     </section>
     <section class="card">
+      <h2>💾 النسخ الاحتياطي</h2>
+      <p class="muted small" style="margin-top:0">النسخة الكاملة فيها كل شي: الأسماء، أرقام التذاكر، <b>رموز الـQR</b>، والدخولات والسجل. إذا صار أي شي للقاعدة، الاسترجاع يرجّع كلشي، والتذاكر اللي عند الطلاب تبقى شغالة.</p>
+      <button class="btn" id="bkDownload" style="width:100%">⬇️ تنزيل نسخة احتياطية كاملة</button>
+      <div class="bk-info"><div id="bkLast"></div><div id="bkAuto"></div></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost sm" id="bkAutoBtn">تنزيل النسخة التلقائية</button>
+        <button class="btn ghost sm" id="bkRestoreBtn">⬆️ استرجاع من نسخة</button>
+      </div>
+      <input type="file" id="bkFile" accept=".json,application/json" hidden>
+      <p class="muted small">احفظ النسخة بمكانين (موبايلك + كوكل درايف). النسخة التلقائية تنحفظ بهذا الجهاز كل 5 دقايق وهو فاتح لوحة الإدارة.</p>
+      <hr class="sep">
       <h2>بعد البروفة</h2>
       <p class="muted small">يصفّر كل الدخولات والسجل حتى تبدون يوم الحفلة من الصفر. التذاكر والأسماء تبقى نفسها.</p>
       <button class="btn danger" id="resetAll" style="width:100%">تصفير كل الدخولات</button>
@@ -207,9 +219,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js?v=9"></script>
-<script src="api.js?v=9"></script>
-<script src="ticket.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="api.js?v=10"></script>
+<script src="ticket.js?v=10"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -244,10 +256,61 @@
     } catch (err) { U.toast("مشكلة بالاتصال", "bad"); }
     finally { b.disabled = false; }
   };
+  // ---------- النسخ الاحتياطي ----------
+  const BK_LAST = "frq_last_backup", BK_AUTO = "frq_auto_backup";
+  const stamp = d => { const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()); };
+  function saveFile(obj, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(obj)], { type: "application/json" }));
+    a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  async function downloadBackup(btn) {
+    const l = btn && btn.innerHTML; if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+    try {
+      const d = await call("admin_export"); if (d.status !== "ok") return U.toast("ما اشتغل التنزيل", "bad");
+      delete d.status; saveFile(d, "scrub-day-backup-" + stamp(new Date()) + ".json");
+      const now = new Date().toISOString();
+      U.store.set(BK_LAST, now); U.store.set(BK_AUTO, { at: now, data: d });
+      renderBackupInfo(); U.toast("انحفظت النسخة ✓ خليها بمكان آمن", "ok");
+    } catch (e) { if (e.message !== "pin") U.toast("مشكلة بالاتصال", "bad"); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = l; } }
+  }
+  async function autoSnapshot() {
+    try { const d = await call("admin_export"); if (d.status === "ok") { delete d.status; U.store.set(BK_AUTO, { at: new Date().toISOString(), data: d }); renderBackupInfo(); } } catch (e) {}
+  }
+  function renderBackupInfo() {
+    const last = U.store.get(BK_LAST), auto = U.store.get(BK_AUTO);
+    $("#bkLast").textContent = last ? "آخر نسخة نزّلتها: " + U.dateTime(last) : "ما نزّلت أي نسخة بعد";
+    $("#bkAuto").textContent = auto ? "النسخة التلقائية بهذا الجهاز: " + U.dateTime(auto.at) + " · " + (auto.data.students || []).length + " اسم" : "ماكو نسخة تلقائية بعد";
+    $("#bkAutoBtn").disabled = !auto;
+    const old = !last || Date.now() - new Date(last).getTime() > 24 * 3600e3;
+    const near = new Date(E.startISO).getTime() - Date.now() < 3 * 24 * 3600e3;
+    $("#bkBanner").hidden = !(rows.length && old && (near || !last));
+  }
+  $("#bkDownload").onclick = e => downloadBackup(e.currentTarget);
+  $("#bkBannerBtn").onclick = e => downloadBackup(e.currentTarget);
+  $("#bkAutoBtn").onclick = () => { const a = U.store.get(BK_AUTO); if (a) saveFile(a.data, "scrub-day-auto-backup-" + stamp(new Date(a.at)) + ".json"); };
+  $("#bkRestoreBtn").onclick = () => $("#bkFile").click();
+  $("#bkFile").onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (err) { return U.toast("الملف مو نسخة احتياطية صالحة", "bad"); }
+    if (data.app !== "scrub-day" || !Array.isArray(data.students)) return U.toast("الملف مو نسخة احتياطية من هذا النظام", "bad");
+    const msg = "⚠️ الاسترجاع يمسح كل البيانات الحالية ويرجّع النسخة:\n" + data.students.length + " اسم · " + (data.log || []).length + " سجل · بتاريخ " + U.dateTime(data.exported_at) +
+      "\n\nللتأكيد اكتب: استرجاع";
+    if (prompt(msg) !== "استرجاع") return;
+    try {
+      const r = await call("admin_import", { p_data: data });
+      if (r.status !== "ok") return U.toast("ما انسترجعت — الملف غير صالح", "bad");
+      U.toast("انسترجعت ✓ " + r.students + " اسم و " + r.log + " سجل", "ok"); load();
+    } catch (err) { if (err.message !== "pin") U.toast("مشكلة بالاتصال", "bad"); }
+  };
+
   function enter(r) {
     rows = r.students; isOpen = r.open !== false;
     $("#loginView").hidden = true; $("#adminView").hidden = false; render(); renderLinks();
     setInterval(() => { if (!document.hidden) load(); }, 12000);
+    renderBackupInfo(); setTimeout(autoSnapshot, 3000); setInterval(autoSnapshot, 5 * 60000);
   }
   $("#logout").onclick = () => { U.store.del(SESS, sessionStorage); location.reload(); };
 
@@ -308,7 +371,7 @@
   function render() {
     const total = rows.length, issued = rows.filter(r => r.issued_at).length, inn = rows.filter(r => r.at).length, ov = rows.reduce((a, r) => a + (r.ov || 0), 0);
     $("#sTotal").textContent = total; $("#sIssued").textContent = issued; $("#sIn").textContent = inn; $("#sOv").textContent = ov;
-    fillLogSid();
+    fillLogSid(); if ($("#bkLast")) renderBackupInfo();
     $("#openSw").setAttribute("aria-checked", isOpen); $("#openLbl").textContent = isOpen ? "مفتوح — الطلاب يكدرون يطلّعون تذاكر" : "مسدود — ماكو إصدار تذاكر جديدة";
     if (document.querySelector(".menu .pop:not([hidden])")) return; // لا تعيد الرسم والقائمة مفتوحة
     const q = U.norm($("#q").value);
