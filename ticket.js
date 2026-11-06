@@ -110,6 +110,11 @@
 
   function fileName(t) { return (t.kind && t.kind !== "regular" ? "دعوة-" + t.kind.toUpperCase() + "-" : "تذكرة-") + "حفلة-السكراب-" + U.no(t.no || t.id); }
 
+  async function toBlob(el) {
+    const url = await toPng(el);
+    return (await fetch(url)).blob();
+  }
+
   async function downloadPng(el, t) {
     const url = await toPng(el);
     const a = document.createElement("a"); a.href = url; a.download = fileName(t) + ".png"; a.click();
@@ -125,5 +130,5 @@
     pdf.save(fileName(t) + ".pdf");
   }
 
-  window.Ticket = { html, qrSvg, downloadPng, downloadPdf, SCRUB, CROSS, KINDS };
+  window.Ticket = { html, qrSvg, downloadPng, downloadPdf, toBlob, SCRUB, CROSS, KINDS };
 })();

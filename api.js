@@ -58,6 +58,7 @@
   }
   function doCheckin(s, gate, kind) {
     const base = { id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title };
+    if (s.checked_in_at && s.out_at) { s.out_at = null; log(s, "reentry", gate); save(); return { status: "ok", reentry: true, ...base, at: s.checked_in_at }; }
     if (s.checked_in_at) {
       log(s, "used", gate); save();
       return { status: "used", ...base, at: s.checked_in_at, by: s.checked_in_by, overrides: s.override_count };
@@ -66,6 +67,12 @@
     return { status: "ok", ...base, at: s.checked_in_at };
   }
   const BAD = { status: "bad_pin" };
+  function doExit(s, gate) {
+    const base = { id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind };
+    if (!s.checked_in_at) return { status: "not_in", ...base };
+    if (s.out_at) return { status: "already_out", ...base, out_at: s.out_at };
+    s.out_at = now(); log(s, "exit", gate); save(); return { status: "exit", ...base, out_at: s.out_at };
+  }
 
   const Mock = {
     list_students: () => ({ open: load().settings.tickets_open === "true", count: db.students.filter(s => s.listed).length }),
@@ -102,8 +109,16 @@
       const s = db.students.find(x => x.token && x.token === p_token);
       if (!s) { log(null, "invalid", p_gate); save(); return { status: "invalid" }; }
       const base = { id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title };
-      if (s.checked_in_at) { log(s, "used", p_gate); save(); return { status: "used", ...base, at: s.checked_in_at, by: s.checked_in_by, overrides: s.override_count }; }
-      return { status: "valid", ...base };
+      if (s.checked_in_at && !s.out_at) { log(s, "used", p_gate); save(); return { status: "used", ...base, at: s.checked_in_at, by: s.checked_in_by, overrides: s.override_count }; }
+      return { status: "valid", ...base, reentry: !!s.out_at, out_at: s.out_at };
+    },
+    exit_ticket: ({ p_token, p_pin, p_gate }) => {
+      if (!pin("scanner", p_pin)) return BAD;
+      const s = db.students.find(x => x.token && x.token === p_token); return s ? doExit(s, p_gate) : { status: "invalid" };
+    },
+    exit_by_id: ({ p_id, p_pin, p_gate }) => {
+      if (!pin("scanner", p_pin)) return BAD;
+      const s = find(p_id); return s ? doExit(s, (p_gate || "") + " (يدوي)") : { status: "invalid" };
     },
     reject_entry: ({ p_id, p_pin, p_gate, p_reason }) => {
       if (!pin("scanner", p_pin)) return BAD;
@@ -116,18 +131,18 @@
     override_entry: ({ p_id, p_pin, p_gate, p_reason }) => {
       if (!pin("scanner", p_pin)) return BAD;
       const s = find(p_id); if (!s) return { status: "invalid" };
-      s.override_count++; if (!s.checked_in_at) { s.checked_in_at = now(); s.checked_in_by = p_gate || ""; }
+      s.override_count++; s.out_at = null; if (!s.checked_in_at) { s.checked_in_at = now(); s.checked_in_by = p_gate || ""; }
       log(s, "override", p_gate, (p_reason || "").trim() || "بدون سبب"); save();
       return { status: "override", id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, overrides: s.override_count };
     },
     scanner_list: async ({ p_pin }) => {
       if (!pin("scanner", p_pin)) return BAD;
       const rows = db.students.slice().sort(byName);
-      return { status: "ok", students: await Promise.all(rows.map(async s => ({ id: s.id, no: s.ticket_no, name: s.full_name, k: s.kind, h: s.token ? await sha256(s.token) : null, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count }))) };
+      return { status: "ok", students: await Promise.all(rows.map(async s => ({ id: s.id, no: s.ticket_no, name: s.full_name, k: s.kind, h: s.token ? await sha256(s.token) : null, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null }))) };
     },
     admin_list: ({ p_pin }) => {
       if (!pin("admin", p_pin)) return BAD;
-      return { status: "ok", open: db.settings.tickets_open === "true", students: db.students.slice().sort((a, b) => a.ticket_no - b.ticket_no).map(s => ({ id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title, note: s.note, listed: s.listed, issued_at: s.issued_at, open_count: s.open_count, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count })) };
+      return { status: "ok", open: db.settings.tickets_open === "true", students: db.students.slice().sort((a, b) => a.ticket_no - b.ticket_no).map(s => ({ id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title, note: s.note, listed: s.listed, issued_at: s.issued_at, open_count: s.open_count, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null })) };
     },
     admin_update: ({ p_pin, p_id, p_data: d }) => {
       if (!pin("admin", p_pin)) return BAD;
@@ -187,11 +202,11 @@
     },
     admin_undo_checkin: ({ p_pin, p_id }) => {
       if (!pin("admin", p_pin)) return BAD;
-      const s = find(p_id); if (s) { s.checked_in_at = null; s.checked_in_by = null; log(s, "undo", "الإدارة"); } save(); return { status: "ok" };
+      const s = find(p_id); if (s) { s.checked_in_at = null; s.checked_in_by = null; s.out_at = null; log(s, "undo", "الإدارة"); } save(); return { status: "ok" };
     },
     admin_reset_checkins: ({ p_pin }) => {
       if (!pin("admin", p_pin)) return BAD;
-      db.students.forEach(s => { s.checked_in_at = null; s.checked_in_by = null; s.override_count = 0; }); db.log = []; save();
+      db.students.forEach(s => { s.checked_in_at = null; s.checked_in_by = null; s.override_count = 0; s.out_at = null; }); db.log = []; save();
       return { status: "ok" };
     },
     admin_set_setting: ({ p_pin, p_key, p_value }) => {

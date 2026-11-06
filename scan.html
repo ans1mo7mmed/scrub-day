@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -44,6 +44,8 @@
   </div>
 
   <section id="tab-cam">
+    <div class="modes" id="modes"><button class="on" data-mode="in">🟢 دخول</button><button data-mode="out">🚪 خروج مؤقت</button></div>
+    <div class="mode-note" id="modeNote" hidden>وضع الخروج المؤقت: امسح تذكرة الطالب الطالع، ومن يرجع يدخل بنفس التذكرة بشكل طبيعي</div>
     <div class="cam">
       <video id="video" playsinline muted></video>
       <div class="frame"></div>
@@ -124,8 +126,8 @@
 
 <canvas id="cv" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="config.js"></script>
-<script src="api.js"></script>
+<script src="config.js?v=7"></script>
+<script src="api.js?v=7"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -137,6 +139,7 @@
   const hashCache = new Map();
 
   const ICONS = {
+    exit: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></svg>',
     ok: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
     used: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>',
     invalid: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
@@ -144,7 +147,7 @@
     rejected: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>',
     override: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>'
   };
-  const LABEL = { ok: "دخل", manual: "يدوي", used: "مستخدمة", invalid: "غير صالحة", override: "استثناء", offline: "أوفلاين", rejected: "مرفوض" };
+  const LABEL = { exit: "خروج مؤقت", reentry: "رجوع", ok: "دخل", manual: "يدوي", used: "مستخدمة", invalid: "غير صالحة", override: "استثناء", offline: "أوفلاين", rejected: "مرفوض" };
 
   // ---------- login ----------
   async function login(p, g, silent) {
@@ -190,8 +193,8 @@
     } catch (e) { if (e instanceof U.NetError) setOnline(false); }
   }
   function updateCount() {
-    const inn = list.filter(s => s.at).length;
-    $("#cnt").textContent = inn + " / " + list.length;
+    const inn = list.filter(s => s.at && !s.out).length, outN = list.filter(s => s.at && s.out).length;
+    $("#cnt").textContent = inn + " / " + list.length + (outN ? " · برة " + outN : "");
     $("#barI").style.width = (list.length ? inn / list.length * 100 : 0) + "%";
   }
   function setOnline(v) {
@@ -217,6 +220,7 @@
         const q = queue[0]; let r;
         if (q.type === "scan") r = await API.rpc("check_in", { p_token: q.token, p_pin: pin, p_gate: q.gate, p_offline: true });
         else if (q.type === "manual") r = await API.rpc("check_in_by_id", { p_id: q.id, p_pin: pin, p_gate: q.gate });
+        else if (q.type === "exit") r = await API.rpc("exit_by_id", { p_id: q.id, p_pin: pin, p_gate: q.gate });
         else if (q.type === "reject") r = await API.rpc("reject_entry", { p_id: q.id, p_pin: pin, p_gate: q.gate, p_reason: q.reason });
         else if (q.type === "override") r = await API.rpc("override_entry", { p_id: q.id, p_pin: pin, p_gate: q.gate, p_reason: q.reason });
         if (r && r.status === "bad_pin") break;
@@ -295,7 +299,8 @@
     const fast = list.find(x => x.h && x.h === hashCache.get(token)) || null;
     const h = hashCache.get(token) || await U.sha256(token); hashCache.set(token, h);
     const s0 = fast || list.find(x => x.h === h);
-    if (s0 && !s0.at) return askVerify({ status: "valid", id: s0.id, no: s0.no, kind: s0.k, name: s0.name, token });
+    if (mode === "out") return doExit(token, s0);
+    if (s0 && (!s0.at || s0.out)) return askVerify({ status: "valid", id: s0.id, no: s0.no, kind: s0.k, name: s0.name, token, reentry: !!(s0.at && s0.out) });
     try {
       // فحص فقط — ما ينسجل دخول إلا بعد تأكيد الهوية
       const r = await API.rpc("peek_ticket", { p_token: token, p_pin: pin, p_gate: gate });
@@ -314,8 +319,8 @@
     const h = await U.sha256(token);
     const s = list.find(x => x.h === h);
     if (!s) return show({ status: "invalid" }, "مو موجودة بالنسخة المحفوظة — ممكن مزورة أو طلّعها بعد آخر تحديث. جرّب البحث اليدوي بالاسم");
-    if (s.at) return show({ status: "used", id: s.id, no: s.no, kind: s.k, name: s.name, at: s.at, by: s.by }, null, true);
-    askVerify({ status: "valid", id: s.id, no: s.no, kind: s.k, name: s.name, token, offline: true });
+    if (s.at && !s.out) return show({ status: "used", id: s.id, no: s.no, kind: s.k, name: s.name, at: s.at, by: s.by }, null, true);
+    askVerify({ status: "valid", id: s.id, no: s.no, kind: s.k, name: s.name, token, offline: true, reentry: !!(s.at && s.out) });
   }
 
   // ---------- خطوة التحقق من الهوية ----------
@@ -323,7 +328,7 @@
     current = r;
     $("#result").className = "result verify";
     $("#rIc").innerHTML = ICONS.verify;
-    $("#rSt").textContent = "تذكرة صالحة — تحقق من الهوية قبل القبول";
+    $("#rSt").textContent = r.reentry ? "↩️ رجوع بعد خروج مؤقت — تحقق من الهوية" : "تذكرة صالحة — تحقق من الهوية قبل القبول";
     $("#rNm").textContent = r.name;
     $("#rMeta").innerHTML = "رقم التذكرة № " + U.no(r.no || r.id) + (r.kind && r.kind !== "regular" ? '<br><span class="kindbadge">' + r.kind.toUpperCase() + "</span>" : "");
     $("#rNote").innerHTML = "<b>هل تأكدت إن هذا الشخص هو صاحب التذكرة الفعلي؟</b><br>طابق الاسم مع <b>البطاقة الوطنية</b> أو <b>الهوية الجامعية</b>";
@@ -383,11 +388,14 @@
   function markLocal(id, x) {
     const s = list.find(y => y.id === id); if (!s) return;
     if (!s.at) { s.at = (x && x.at) || new Date().toISOString(); s.by = (x && x.by) || gate; }
+    if (x && x.status !== "used") s.out = null;
+    if (x && x.status === "exit") s.out = x.out_at || new Date().toISOString();
     updateCount(); clearTimeout(markLocal.t); markLocal.t = setTimeout(() => U.store.set(CACHE, list), 800);
   }
   function show(r, why, offline) {
     clearTimeout(autoClose);
     if (r.status === "ok") autoClose = setTimeout(() => { if (!$("#result").hidden && current === r) closeResult(); }, 1500);
+    if (["exit", "already_out", "not_in"].includes(r.status)) return showExit(r, offline);
     const st = ["ok", "used", "override", "rejected"].includes(r.status) ? r.status : "invalid";
     current = r;
     $("#result").className = "result " + st;
@@ -396,7 +404,7 @@
     $("#rNm").textContent = r.name || "—";
     $("#rMeta").innerHTML = (r.id ? "رقم التذكرة № " + U.no(r.no || r.id) : "") + (r.kind && r.kind !== "regular" ? '<br><span class="kindbadge">' + r.kind.toUpperCase() + "</span>" : "");
     $("#rNote").textContent =
-      st === "ok" ? "انسجل دخوله" + (offline ? " · (بدون انترنت — راح يتزامن)" : "") :
+      st === "ok" ? (r.reentry ? "رجع بعد خروج مؤقت ✓" : "انسجل دخوله") + (offline ? " · (بدون انترنت — راح يتزامن)" : "") :
       st === "used" ? "السبب: انقرت قبل الساعة " + U.time(r.at) + (r.by ? " من " + r.by : "") + (r.overrides ? " · سماحات سابقة: " + r.overrides : "") :
       st === "override" ? "انسجل كاستثناء باسمك" + (offline ? " (راح يتزامن)" : "") :
       st === "rejected" ? "السبب: " + (why || "") + " — انسجل بالسجل" :
@@ -408,6 +416,50 @@
     beep(st === "ok" ? "ok" : st === "override" ? "override" : "bad");
     pushRecent(r.name || "كود غير صالح", st);
   }
+  function showExit(r, offline) {
+    current = r; clearTimeout(autoClose);
+    const ok = r.status === "exit";
+    $("#result").className = "result " + (ok ? "exit" : "invalid");
+    $("#rIc").innerHTML = ok ? ICONS.exit : ICONS.invalid;
+    $("#rSt").textContent = ok ? "🚪 تم تسجيل خروج مؤقت" : r.status === "already_out" ? "مسجّل خروجه من قبل" : "✕ هذا الطالب ما مسجّل دخوله أصلاً";
+    $("#rNm").textContent = r.name || "—";
+    $("#rMeta").innerHTML = r.id ? "رقم التذكرة № " + U.no(r.no || r.id) : "";
+    $("#rNote").textContent = ok ? "من يرجع يدخل بنفس التذكرة بشكل طبيعي" + (offline ? " · (بدون انترنت — راح يتزامن)" : "")
+      : r.status === "already_out" ? "طلع الساعة " + U.time(r.out_at) + " — من يرجع امسحه بوضع الدخول" : "ما يحتاج خروج مؤقت";
+    $("#rNext").hidden = false; ["rYes", "rNo", "rOverride", "rManual"].forEach(id => $("#" + id).hidden = true);
+    $("#result").hidden = false;
+    beep(ok ? "verify" : "bad");
+    pushRecent(r.name || "—", ok ? "exit" : "invalid");
+    if (ok) autoClose = setTimeout(() => { if (!$("#result").hidden && current === r) closeResult(); }, 1500);
+  }
+  async function doExit(token, s0, byId) {
+    try {
+      const r = byId ? await API.rpc("exit_by_id", { p_id: byId, p_pin: pin, p_gate: gate })
+                     : await API.rpc("exit_ticket", { p_token: token, p_pin: pin, p_gate: gate });
+      setOnline(true);
+      if (r.status === "invalid") return show({ status: "invalid" }, "كود مزور أو ملغي — غير موجود بالنظام");
+      if (r.status === "exit") markLocal(r.id, r);
+      showExit(r);
+    } catch (e) {
+      if (!(e instanceof U.NetError)) { busy = false; return U.toast("خطأ بالسيرفر", "bad"); }
+      setOnline(false);
+      const s = s0 || (byId && list.find(x => x.id === byId));
+      if (!s) return show({ status: "invalid" }, "مو موجودة بالنسخة المحفوظة");
+      if (!s.at) return showExit({ status: "not_in", id: s.id, no: s.no, name: s.name });
+      if (s.out) return showExit({ status: "already_out", id: s.id, no: s.no, name: s.name, out_at: s.out });
+      s.out = new Date().toISOString(); U.store.set(CACHE, list); updateCount();
+      enqueue({ type: "exit", id: s.id, gate });
+      showExit({ status: "exit", id: s.id, no: s.no, name: s.name }, true);
+    }
+  }
+  let mode = "in";
+  $("#modes").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    mode = b.dataset.mode;
+    document.querySelectorAll("#modes button").forEach(x => x.classList.toggle("on", x === b));
+    $("#modeNote").hidden = mode !== "out";
+    document.querySelector(".cam").classList.toggle("exitmode", mode === "out");
+  };
   function closeResult() { $("#result").hidden = true; busy = false; }
   $("#rNext").onclick = closeResult;
   $("#rManual").onclick = () => { closeResult(); tab("manual"); $("#mq").focus(); };
@@ -459,12 +511,14 @@
     const q = U.norm($("#mq").value);
     const rows = (q ? list.filter(s => U.norm(s.name).includes(q) || U.no(s.no || s.id).includes(q)) : list).slice(0, 80);
     $("#mlist").innerHTML = rows.length ? rows.map(s => `
-      <li><div class="nm">${U.esc(s.name)}<small>№ ${U.no(s.no || s.id)}${s.k && s.k !== "regular" ? " · " + s.k.toUpperCase() : ""}${s.at ? " · دخل " + U.time(s.at) + (s.by ? " · " + U.esc(s.by) : "") : ""}${s.ov ? " · استثناءات: " + s.ov : ""}</small></div>
-      ${s.at ? `<button class="btn sm outline-warn" data-ov="${s.id}">سماح استثنائي</button>` : `<button class="btn sm" data-id="${s.id}">تسجيل دخول</button>`}</li>`).join("")
+      <li><div class="nm">${U.esc(s.name)}<small>№ ${U.no(s.no || s.id)}${s.k && s.k !== "regular" ? " · " + s.k.toUpperCase() : ""}${s.at ? " · دخل " + U.time(s.at) + (s.by ? " · " + U.esc(s.by) : "") : ""}${s.out ? " · 🚪 برة من " + U.time(s.out) : ""}${s.ov ? " · استثناءات: " + s.ov : ""}</small></div>
+      ${!s.at ? `<button class="btn sm" data-id="${s.id}">تسجيل دخول</button>` : s.out ? `<button class="btn sm" data-id="${s.id}">تسجيل رجوع</button>` : `<span class="mbtns"><button class="btn sm ghost" data-exit="${s.id}">خروج مؤقت</button><button class="btn sm outline-warn" data-ov="${s.id}">استثناء</button></span>`}</li>`).join("")
       : '<li class="empty" style="display:block">ماكو نتائج</li>';
   }
   $("#mq").addEventListener("input", renderManual);
   $("#mlist").addEventListener("click", async e => {
+    const ex = e.target.closest("button[data-exit]");
+    if (ex) { const s = list.find(x => x.id === +ex.dataset.exit); if (!confirm("تسجيل خروج مؤقت: " + s.name + "؟")) return; busy = true; await doExit(null, s, s.id); return renderManual(); }
     const ov = e.target.closest("button[data-ov]");
     if (ov) { const s = list.find(x => x.id === +ov.dataset.ov); return openOverride({ id: s.id, no: s.no, name: s.name }); }
     const b = e.target.closest("button[data-id]"); if (!b) return;

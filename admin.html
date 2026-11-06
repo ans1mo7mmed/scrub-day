@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -87,6 +87,7 @@
         <button data-f="in">دخلوا</button>
         <button data-f="out">ما دخلوا</button>
         <button data-f="ov">استثناءات</button>
+        <button data-f="outside">برة مؤقتاً</button>
         <button data-f="vip">VIP / VVIP</button>
         <button data-f="hidden">بدون إصدار ذاتي</button>
       </div>
@@ -108,6 +109,7 @@
         <button data-f="invalid">غير صالحة</button>
         <button data-f="manual">يدوي</button>
         <button data-f="rejected">مرفوضين</button>
+        <button data-f="exit">خروج مؤقت</button>
         <button data-f="note">ملاحظات</button>
       </div>
     </div>
@@ -185,9 +187,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js"></script>
-<script src="api.js"></script>
-<script src="ticket.js"></script>
+<script src="config.js?v=7"></script>
+<script src="api.js?v=7"></script>
+<script src="ticket.js?v=7"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -195,7 +197,7 @@
   const SESS = "frq_admin";
   let pin = "", rows = [], logRows = [], filter = "all", logFilter = "all", isOpen = true, activeTab = "students";
   $("#evLine").textContent = E.dateText + " · " + E.venue;
-  const RES = { ok: ["دخل", "in"], manual: ["يدوي", "iss"], offline: ["أوفلاين", "iss"], used: ["مستخدمة مسبقاً", "bad"], invalid: ["غير صالحة", "out"], override: ["سماح استثنائي", "warn"], undo: ["إلغاء دخول", "out"], note: ["ملاحظة", "iss"], rejected: ["مرفوض بالتحقق", "bad"] };
+  const RES = { ok: ["دخل", "in"], manual: ["يدوي", "iss"], offline: ["أوفلاين", "iss"], used: ["مستخدمة مسبقاً", "bad"], invalid: ["غير صالحة", "out"], override: ["سماح استثنائي", "warn"], undo: ["إلغاء دخول", "out"], exit: ["خروج مؤقت", "outside"], reentry: ["رجوع", "in"], note: ["ملاحظة", "iss"], rejected: ["مرفوض بالتحقق", "bad"] };
 
   async function call(fn, args) {
     const r = await API.rpc(fn, Object.assign({ p_pin: pin }, args || {}));
@@ -297,6 +299,7 @@
       if (filter === "out" && r.at) return false;
       if (filter === "ov" && !r.ov) return false;
       if (filter === "vip" && r.kind === "regular") return false;
+      if (filter === "outside" && !r.out) return false;
       if (filter === "hidden" && r.listed !== false) return false;
       return !q || U.norm(r.name).includes(q) || U.no(r.no).includes(q) || U.norm(r.title || "").includes(q);
     }).sort((a, b) => a.name.localeCompare(b.name, "ar"));
@@ -307,7 +310,7 @@
           ${r.kind !== "regular" ? ` <span class="tag ${r.kind}">${r.kind.toUpperCase()}</span>` : ""}${r.listed === false ? ' <span class="tag out">مخفي</span>' : ""}
           ${r.title ? `<span class="sub">${U.esc(r.title)}</span>` : ""}${r.note ? `<span class="sub" style="color:#fde68a">📝 ${U.esc(r.note)}</span>` : ""}</td>
         <td>${r.issued_at ? `<span class="tag iss">طلّعها</span><span class="sub">${U.dateTime(r.issued_at)} · فتحها ${r.open_count} مرة</span>` : '<span class="tag out">لسه</span>'}</td>
-        <td>${r.at ? `<span class="tag in">دخل ${U.time(r.at)}</span><span class="sub">${U.esc(r.by || "")}</span>` : '<span class="tag out">—</span>'}${r.ov ? ` <span class="tag warn">استثناء ×${r.ov}</span>` : ""}</td>
+        <td>${r.at ? `<span class="tag in">دخل ${U.time(r.at)}</span>${r.out ? ` <span class="tag outside">🚪 برة من ${U.time(r.out)}</span>` : ""}<span class="sub">${U.esc(r.by || "")}</span>` : '<span class="tag out">—</span>'}${r.ov ? ` <span class="tag warn">استثناء ×${r.ov}</span>` : ""}</td>
         <td class="act"><div class="menu"><button data-menu="${r.id}" aria-label="خيارات">⋯</button>
           <div class="pop" hidden>
             <button data-act="ticket" data-id="${r.id}">عرض / تحميل التذكرة</button>
