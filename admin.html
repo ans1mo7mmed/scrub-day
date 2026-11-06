@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=12">
+<link rel="stylesheet" href="app.css?v=13">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -36,6 +36,10 @@
     </div>
   </div>
 
+  <section class="alerts-panel" id="alertsPanel" hidden>
+    <div class="alerts-head">🚨 <b>بلاغات الطلاب</b> <span id="alertsCount"></span><span class="muted small">— طالب يكول تذكرته انستخدمت وهو ما دخل</span></div>
+    <div id="alertsList"></div>
+  </section>
   <div class="bk-banner" id="bkBanner" hidden>⚠️ <b>ما عندك نسخة احتياطية حديثة.</b> نزّل وحدة هسه واحفظها بمكان آمن. <button class="btn sm" id="bkBannerBtn">تنزيل نسخة الآن</button></div>
   <div class="stats">
     <div class="stat"><span>الطلاب الدافعين</span><b id="sTotal">0</b></div>
@@ -158,6 +162,21 @@
         <button class="switch" id="openSw" role="switch" aria-checked="true"><i></i></button>
       </div>
       <hr class="sep">
+      <h2>📞 رقم ممثل الدفعة</h2>
+      <div class="row"><input class="input" id="repPhone" type="tel" dir="ltr" placeholder="+964 7XX XXX XXXX"><button class="btn sm" id="saveRep" style="flex:0 0 auto">حفظ</button></div>
+      <p class="muted small">يطلع للطالب اللي يبلّغ إن تذكرته انستخدمت، حتى يتصل بيك إذا تأخرت.</p>
+      <hr class="sep">
+      <h2>🎉 وضع ما بعد الحفلة</h2>
+      <div class="switch-row">
+        <div><b id="postLbl">مطفي</b><div class="muted small">إذا شغلته، صفحة الطلاب تطلع "شكراً لحضوركم 💙" ووياها روابط الصور والاستبيان.</div></div>
+        <button class="switch" id="postSw" role="switch" aria-checked="false"><i></i></button>
+      </div>
+      <div class="form" style="margin-top:10px">
+        <label>رابط صور الحفلة (اختياري)<input class="input" id="photosUrl" dir="ltr" placeholder="https://drive.google.com/…"></label>
+        <label>رابط استبيان الرأي (اختياري)<input class="input" id="surveyUrl" dir="ltr" placeholder="https://forms.gle/…"></label>
+        <button class="btn sm" id="saveLinks">حفظ الروابط</button>
+      </div>
+      <hr class="sep">
       <h2>كشف الحضور للمتطوعين</h2>
       <div class="switch-row">
         <div><b id="vexLbl">مسدود</b><div class="muted small">إذا فعّلته، كل متطوع يكدر ينزّل من الماسح PDF بكل الأسماء وأرقام التذاكر (حل احتياطي إذا النظام ما اشتغل). فعّله بعد ما ترفعون الأسماء.</div></div>
@@ -230,9 +249,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js?v=12"></script>
-<script src="api.js?v=12"></script>
-<script src="ticket.js?v=12"></script>
+<script src="config.js?v=13"></script>
+<script src="api.js?v=13"></script>
+<script src="ticket.js?v=13"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -249,7 +268,8 @@
   }
   async function load() {
     try {
-      const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport;
+      const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport; cfg = r.cfg || {};
+      if (r.alerts_open || lastOpen > 0 || lastOpen < 0) loadAlerts();
       if (activeTab === "log" || activeTab === "stats") await loadLog();
       $("#net").className = "netdot on"; $("#upd").textContent = "آخر تحديث " + U.time(new Date().toISOString());
       render();
@@ -318,7 +338,7 @@
   };
 
   function enter(r) {
-    rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport;
+    rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport; cfg = r.cfg || {}; loadAlerts(); fillCfg();
     $("#loginView").hidden = true; $("#adminView").hidden = false; render(); renderLinks();
     setInterval(() => { if (!document.hidden) load(); }, 12000);
     renderBackupInfo(); setTimeout(autoSnapshot, 3000); setInterval(autoSnapshot, 5 * 60000);
@@ -382,7 +402,7 @@
   function render() {
     const total = rows.length, issued = rows.filter(r => r.issued_at).length, inn = rows.filter(r => r.at).length, ov = rows.reduce((a, r) => a + (r.ov || 0), 0);
     $("#sTotal").textContent = total; $("#sIssued").textContent = issued; $("#sIn").textContent = inn; $("#sOv").textContent = ov;
-    fillLogSid(); if ($("#bkLast")) renderBackupInfo();
+    fillLogSid(); if ($("#bkLast")) renderBackupInfo(); fillCfg();
     $("#vexSw").setAttribute("aria-checked", vexport); $("#vexLbl").textContent = vexport ? "مفعّل — المتطوعين يكدرون ينزّلون الكشف" : "مسدود — المتطوعين ما يشوفون زر الكشف";
     $("#openSw").setAttribute("aria-checked", isOpen); $("#openLbl").textContent = isOpen ? "مفتوح — الطلاب يكدرون يطلّعون تذاكر" : "مسدود — ماكو إصدار تذاكر جديدة";
     if (document.querySelector(".menu .pop:not([hidden])")) return; // لا تعيد الرسم والقائمة مفتوحة
@@ -462,6 +482,47 @@
     } catch (err) { if (err.message !== "pin") U.toast("صار خطأ", "bad"); }
   };
   let shown = null;
+  // ---------- بلاغات الطلاب ----------
+  let alerts = [], lastOpen = -1, cfg = {};
+  async function loadAlerts() {
+    try { const r = await call("admin_alerts"); if (r.status === "ok") { alerts = r.alerts; renderAlerts(); } } catch (e) {}
+  }
+  function alertBeep() {
+    try {
+      const a = new (window.AudioContext || window.webkitAudioContext)();
+      [[880, 0], [660, .18], [880, .36]].forEach(([f, d]) => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; g.gain.setValueAtTime(.2, a.currentTime + d); g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + d + .16); o.connect(g).connect(a.destination); o.start(a.currentTime + d); o.stop(a.currentTime + d + .2); });
+    } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate([300, 100, 300]); } catch (e) {}
+  }
+  function renderAlerts() {
+    const open = alerts.filter(a => a.status === "open");
+    const recent = alerts.filter(a => a.status !== "open").slice(0, 3);
+    if (lastOpen >= 0 && open.length > lastOpen) { alertBeep(); U.toast("🚨 بلاغ جديد من طالب!", "bad"); }
+    lastOpen = open.length;
+    document.title = (open.length ? "(" + open.length + ") 🚨 " : "") + "لوحة الإدارة · حفلة السكراب";
+    $("#alertsPanel").hidden = !open.length && !recent.length;
+    $("#alertsPanel").classList.toggle("calm", !open.length);
+    $("#alertsCount").textContent = open.length ? open.length + " مفتوح" : "ماكو بلاغات مفتوحة";
+    $("#alertsList").innerHTML = open.map(a => `
+      <div class="alert-row">
+        <div class="ainfo"><b>${U.esc(a.name || "")}</b> <span class="muted small">№ ${U.no(a.no || 0)}</span>
+          <small>بلّغ الساعة ${U.time(a.at)}${a.used_at ? " · التذكرة انستخدمت " + U.time(a.used_at) + (a.used_by ? " من " + U.esc(a.used_by) : "") : ""}</small></div>
+        <div class="aact"><button class="btn sm" data-reissue="${a.id}">🎟️ تذكرة جديدة</button><button class="btn sm ghost" data-dismiss="${a.id}">✓ تم الحل</button></div>
+      </div>`).join("") + recent.map(a => `
+      <div class="alert-row done"><div class="ainfo"><b>${U.esc(a.name || "")}</b> <small>${a.action === "reissue" ? "انطت تذكرة جديدة" : "انحلت"} ${U.time(a.resolved_at)}</small></div></div>`).join("");
+  }
+  $("#alertsList").addEventListener("click", async e => {
+    const re = e.target.closest("[data-reissue]"), di = e.target.closest("[data-dismiss]");
+    if (re) {
+      if (!confirm("إصدار تذكرة جديدة؟\nالـQR القديم يبطل فوراً (حتى اللي استخدمه ما يكدر يرجع يستخدمه)، ودخول الطالب يتصفّر حتى يدخل بالجديدة.")) return;
+      const t = await call("admin_alert_resolve", { p_id: +re.dataset.reissue, p_action: "reissue" });
+      if (t.status === "ok") { U.toast("تطلعت تذكرة جديدة ✓ — حمّلها ودزها للطالب", "ok"); showTicket(t); }
+      load(); loadAlerts();
+    } else if (di) {
+      await call("admin_alert_resolve", { p_id: +di.dataset.dismiss, p_action: "dismiss" }); load(); loadAlerts();
+    }
+  });
+
   function showTicket(t) {
     shown = t; $("#tkBox").innerHTML = Ticket.html(t); $("#tkDlg").showModal();
   }
@@ -632,6 +693,25 @@
   }
 
   // ---------- settings ----------
+  function fillCfg() {
+    if (document.activeElement !== $("#repPhone")) $("#repPhone").value = cfg.rep_phone || "";
+    if (document.activeElement !== $("#photosUrl")) $("#photosUrl").value = cfg.photos_url || "";
+    if (document.activeElement !== $("#surveyUrl")) $("#surveyUrl").value = cfg.survey_url || "";
+    const post = cfg.event_mode === "post";
+    $("#postSw").setAttribute("aria-checked", post); $("#postLbl").textContent = post ? "شغّال — الطلاب يشوفون صفحة الشكر" : "مطفي";
+  }
+  async function saveCfg(key, val, okMsg) {
+    const r = await call("admin_set_setting", { p_key: key, p_value: val });
+    if (r.status !== "ok") return U.toast(key === "rep_phone" ? "الرقم غير صحيح" : "الرابط لازم يبدي بـ https://", "bad"), false;
+    cfg[key] = val; fillCfg(); if (okMsg) U.toast(okMsg, "ok"); return true;
+  }
+  $("#saveRep").onclick = () => saveCfg("rep_phone", $("#repPhone").value.trim(), "انحفظ الرقم ✓");
+  $("#saveLinks").onclick = async () => { if (await saveCfg("photos_url", $("#photosUrl").value.trim())) await saveCfg("survey_url", $("#surveyUrl").value.trim(), "انحفظت الروابط ✓"); };
+  $("#postSw").onclick = async () => {
+    const v = cfg.event_mode === "post" ? "pre" : "post";
+    if (v === "post" && !confirm("تشغيل وضع ما بعد الحفلة؟ صفحة الطلاب راح تطلع رسالة الشكر.")) return;
+    await saveCfg("event_mode", v, v === "post" ? "تشغّل وضع ما بعد الحفلة ✓" : "رجع الوضع الطبيعي");
+  };
   $("#vexSw").onclick = async () => {
     const v = !vexport;
     if (v && !confirm("تفعيل تنزيل كشف الحضور للمتطوعين؟\nكل متطوع عنده الرمز يكدر ينزّل ملف بكل الأسماء وأرقام التذاكر.")) return;
