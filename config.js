@@ -30,7 +30,7 @@ window.APP_CONFIG = {
     ],
     venue: "ملعب الميناء",
     city: "البصرة",
-    rep: "حسين جليل",
+    rep: "حسين عبد الجليل",
     organizer: "BASRA KING",          // شركة التنظيم
     organizerLabel: "ORGANIZED BY",
     ticketsPerStudent: 1,
