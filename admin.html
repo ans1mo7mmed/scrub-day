@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=7">
+<link rel="stylesheet" href="app.css?v=9">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -46,6 +46,7 @@
   <div class="tabs tabs3" id="mainTabs">
     <button class="on" data-tab="students">الطلاب</button>
     <button data-tab="log">سجل الدخول</button>
+    <button data-tab="stats">📊 إحصائيات حية</button>
     <button data-tab="settings">الإعدادات</button>
   </div>
 
@@ -97,6 +98,25 @@
       </table>
     </section>
   </div>
+
+  <!-- الإحصائيات الحية -->
+  <section id="tab-stats" hidden>
+    <div class="stats live-tiles" id="liveTiles"></div>
+    <section class="card chart-card">
+      <div class="chart-head">
+        <div><h2 style="margin:0">الداخلين بالدقيقة</h2><div class="muted small" id="peakLine"></div></div>
+        <div class="filters" id="rangeChips" style="margin:0"><button data-r="30">30 دقيقة</button><button class="on" data-r="60">ساعة</button><button data-r="180">3 ساعات</button></div>
+      </div>
+      <div class="mchart" id="minuteChart"></div>
+      <div class="mchart-x" id="minuteAxis"></div>
+    </section>
+    <section class="card chart-card">
+      <h2>كل بوابة شكد مشّت</h2>
+      <div id="gateBars"></div>
+      <p class="muted small" style="margin:10px 0 0">"مشاكل" = تذاكر مقروءة مسبقاً + غير صالحة + مرفوضة بالتحقق. البوابة اللي معدلها أعلى وطابورها أطول تحتاج متطوع إضافي.</p>
+    </section>
+    <div class="chart-tip" id="chartTip" hidden></div>
+  </section>
 
   <!-- السجل -->
   <section class="card" id="tab-log" hidden>
@@ -187,9 +207,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js?v=7"></script>
-<script src="api.js?v=7"></script>
-<script src="ticket.js?v=7"></script>
+<script src="config.js?v=9"></script>
+<script src="api.js?v=9"></script>
+<script src="ticket.js?v=9"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -207,12 +227,12 @@
   async function load() {
     try {
       const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false;
-      if (activeTab === "log") await loadLog();
+      if (activeTab === "log" || activeTab === "stats") await loadLog();
       $("#net").className = "netdot on"; $("#upd").textContent = "آخر تحديث " + U.time(new Date().toISOString());
       render();
     } catch (e) { $("#net").className = "netdot off"; }
   }
-  async function loadLog() { const r = await call("admin_log", { p_limit: 500 }); logRows = r.log; renderLog(); }
+  async function loadLog() { const r = await call("admin_log", { p_limit: 2000 }); logRows = r.log; renderLog(); if (activeTab === "stats") renderStats(); }
 
   $("#loginForm").onsubmit = async e => {
     e.preventDefault();
@@ -236,8 +256,8 @@
     const b = e.target.closest("button"); if (!b) return;
     activeTab = b.dataset.tab;
     document.querySelectorAll("#mainTabs button").forEach(x => x.classList.toggle("on", x === b));
-    ["students", "log", "settings"].forEach(t => $("#tab-" + t).hidden = t !== activeTab);
-    if (activeTab === "log") loadLog().catch(() => {});
+    ["students", "log", "stats", "settings"].forEach(t => $("#tab-" + t).hidden = t !== activeTab);
+    if (activeTab === "log" || activeTab === "stats") loadLog().catch(() => {});
   };
 
   function renderLinks() {
@@ -415,6 +435,82 @@
     if (prompt("⚠️ يحذف كل الأسماء والتذاكر والسجل نهائياً. للتأكيد اكتب: حذف الكل") !== "حذف الكل") return;
     await call("admin_delete_all"); U.toast("انحذف كلشي", "ok"); load();
   };
+
+  // ---------- الإحصائيات الحية ----------
+  const ADMIT = new Set(["ok", "manual", "offline", "reentry", "override"]);
+  const PROBLEM = new Set(["used", "invalid", "rejected"]);
+  let range = 60;
+  $("#rangeChips").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    range = +b.dataset.r; document.querySelectorAll("#rangeChips button").forEach(x => x.classList.toggle("on", x === b)); renderStats();
+  };
+  const gateName = g => (g || "بدون اسم").replace(/\s*\((يدوي|أوفلاين|يدوي، أوفلاين)\)\s*$/, "").trim() || "بدون اسم";
+  const hm = d => d.toLocaleTimeString("ar-IQ", { hour: "numeric", minute: "2-digit" });
+  function renderStats() {
+    const now = Date.now(), MIN = 60000;
+    const adm = logRows.filter(l => ADMIT.has(l.result)).map(l => ({ ...l, t: new Date(l.at).getTime() }));
+    const firstIn = adm.filter(l => l.result !== "reentry");
+    const total = rows.length, inside = rows.filter(r => r.at && !r.out).length, outside = rows.filter(r => r.at && r.out).length;
+    const entered = rows.filter(r => r.at).length, left = total - entered;
+    const last5 = firstIn.filter(l => now - l.t <= 5 * MIN).length / 5;
+    const eta = last5 > 0 && left > 0 ? Math.ceil(left / last5) : null;
+    // الذروة: أعلى دقيقة
+    const perMin = new Map();
+    firstIn.forEach(l => { const k = Math.floor(l.t / MIN); perMin.set(k, (perMin.get(k) || 0) + 1); });
+    let peakK = null, peakV = 0; perMin.forEach((v, k) => { if (v > peakV) { peakV = v; peakK = k; } });
+    $("#liveTiles").innerHTML = [
+      ["داخل الآن", inside + (outside ? ` <small>· برة ${outside}</small>` : ""), "g"],
+      ["المعدل (آخر 5 دقايق)", last5 ? last5.toFixed(1) + " <small>بالدقيقة</small>" : "0", "b"],
+      ["باقي ما دخلوا", left, ""],
+      ["الوقت المتوقع للباقين", eta ? (eta < 60 ? eta + " <small>دقيقة</small>" : (eta / 60).toFixed(1) + " <small>ساعة</small>") : "—", "w"]
+    ].map(([k, v, c]) => `<div class="stat ${c}"><span>${k}</span><b>${v}</b></div>`).join("");
+    $("#peakLine").textContent = peakK ? `الذروة: ${peakV} بالدقيقة الساعة ${hm(new Date(peakK * MIN))} · المجموع ${firstIn.length} دخول` : "ماكو دخولات بعد";
+
+    // الأعمدة بالدقيقة
+    const endK = Math.floor(now / MIN), startK = endK - range + 1;
+    const buckets = []; for (let k = startK; k <= endK; k++) buckets.push({ k, v: perMin.get(k) || 0, re: 0 });
+    adm.filter(l => l.result === "reentry").forEach(l => { const b = buckets[Math.floor(l.t / MIN) - startK]; if (b) b.re++; });
+    const max = Math.max(4, ...buckets.map(b => b.v + b.re));
+    const top = Math.ceil(max / 4) * 4;
+    $("#minuteChart").innerHTML =
+      `<div class="mgrid"><em style="bottom:100%"></em><em style="bottom:50%"></em><span style="bottom:100%">${top}</span><span style="bottom:50%">${top / 2}</span><span style="bottom:0">0</span></div>` +
+      `<div class="mbars">` + buckets.map(b => `<i data-k="${b.k}" data-v="${b.v}" data-re="${b.re}" style="height:${((b.v + b.re) / top) * 100}%"${b.k === peakK ? ' class="peak"' : ""}></i>`).join("") + `</div>`;
+    const step = range <= 30 ? 5 : range <= 60 ? 10 : 30;
+    $("#minuteAxis").innerHTML = buckets.map((b, i) => (b.k % step === 0 ? `<span style="left:${(i + .5) / buckets.length * 100}%">${hm(new Date(b.k * MIN))}</span>` : "")).join("");
+
+    // البوابات
+    const gates = new Map();
+    logRows.forEach(l => {
+      const g = gateName(l.gate); if (g === "الإدارة") return;
+      const o = gates.get(g) || { n: 0, re: 0, p: 0, last: 0, rec: 0 };
+      const t = new Date(l.at).getTime();
+      if (ADMIT.has(l.result)) { if (l.result === "reentry") o.re++; else o.n++; o.last = Math.max(o.last, t); if (now - t <= 5 * MIN) o.rec++; }
+      if (PROBLEM.has(l.result)) o.p++;
+      gates.set(g, o);
+    });
+    const list = [...gates.entries()].sort((a, b) => b[1].n - a[1].n);
+    const gmax = Math.max(1, ...list.map(([, o]) => o.n));
+    $("#gateBars").innerHTML = list.length ? list.map(([g, o]) => `
+      <div class="gate-row">
+        <div class="gate-name">${U.esc(g)}<small>${o.rec ? (o.rec / 5).toFixed(1) + " بالدقيقة هسه" : "هادئة"}${o.last ? " · آخر دخول " + hm(new Date(o.last)) : ""}</small></div>
+        <div class="gate-bar"><i style="width:${(o.n / gmax) * 100}%"></i></div>
+        <div class="gate-num"><b>${o.n}</b>${o.re ? `<small>+${o.re} رجوع</small>` : ""}${o.p ? `<small class="warnc">${o.p} مشاكل</small>` : ""}</div>
+      </div>`).join("") : '<div class="empty">ماكو نشاط بالبوابات بعد</div>';
+  }
+  // تلميح عند المرور / اللمس على الأعمدة
+  (function chartTips() {
+    const tip = $("#chartTip"), box = $("#minuteChart");
+    function showTip(e) {
+      const i = e.target.closest("i[data-k]"); if (!i) { tip.hidden = true; return; }
+      const d = new Date(+i.dataset.k * 60000);
+      tip.innerHTML = `<b>${hm(d)}</b><br>${i.dataset.v} دخول${+i.dataset.re ? ` · ${i.dataset.re} رجوع` : ""}`;
+      const r = i.getBoundingClientRect(); tip.hidden = false;
+      tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, Math.max(8, r.left + r.width / 2 - tip.offsetWidth / 2)) + "px";
+      tip.style.top = (r.top + scrollY - tip.offsetHeight - 8) + "px";
+    }
+    box.addEventListener("mousemove", showTip); box.addEventListener("touchstart", showTip, { passive: true });
+    box.addEventListener("mouseleave", () => tip.hidden = true);
+  })();
 
   // ---------- log ----------
   $("#logFilters").addEventListener("click", e => {
