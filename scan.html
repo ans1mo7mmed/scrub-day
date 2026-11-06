@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=11">
+<link rel="stylesheet" href="app.css?v=12">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -71,6 +71,11 @@
       <p class="muted small" style="margin:8px 0 0">للحالات الخاصة (موبايل طافي، تذكرة ما تنقرأ). تأكد من الهوية الجامعية قبل التسجيل.</p>
       <ul class="plist" id="mlist"></ul>
     </div>
+    <div class="card" id="exportCard" hidden style="margin-top:14px">
+      <h2 style="font-size:16px;margin:0 0 6px">📄 كشف الحضور الاحتياطي</h2>
+      <p class="muted small" style="margin:0 0 12px">ينزّل PDF بكل أسماء المشاركين مرتبة أبجدياً مع أرقام تذاكرهم. نزّله <b>قبل ما تروح للملعب</b> وخليه بموبايلك — إذا الماسح ما اشتغل، تطابق الاسم والرقم مع الهوية من الملف. الملف يطلع دايماً بآخر الأسماء المضافة.</p>
+      <button class="btn" id="exBtn" style="width:100%">⬇️ تنزيل كشف الحضور PDF</button>
+    </div>
   </section>
 </main>
 
@@ -129,8 +134,8 @@
 
 <canvas id="cv" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="config.js?v=11"></script>
-<script src="api.js?v=11"></script>
+<script src="config.js?v=12"></script>
+<script src="api.js?v=12"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -142,6 +147,17 @@
   // تعريف المتطوع: معرف ثابت لهذا الجهاز + الاسم والبوابة والرقم
   let vinfo = null;
   const DEVICE = U.store.get("frq_device") || (() => { const d = Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, "0")).join(""); U.store.set("frq_device", d); return d; })();
+  // ---------- كشف الحضور الاحتياطي ----------
+  let exportOK = !!U.store.get("frq_export");
+  function setExport(v) { if (v !== undefined) { exportOK = !!v; U.store.set("frq_export", exportOK); } $("#exportCard").hidden = !(exportOK && list.length); }
+  async function exportList() {
+    const w = window.open("", "_blank");
+    if (!w) return U.toast("المتصفح منع النافذة — اسمح بالنوافذ المنبثقة", "bad");
+    w.document.write('<p dir="rtl" style="font-family:Tahoma;padding:20px">جاري تجهيز الكشف…</p>');
+    try { await refresh(); } catch (e) {}
+    if (!exportOK) { w.close(); return U.toast("الإدارة سدّت تنزيل الكشف", "bad"); }
+    U.gateList(w, list.map(s => ({ name: s.name, no: s.no, id: s.id, kind: s.k, issued: !!s.h })), gate);
+  }
   async function registerVolunteer() {
     if (!vinfo) return;
     try { await API.rpc("volunteer_checkin", { p_pin: pin, p_device: DEVICE, p_name: vinfo.name, p_gate: vinfo.gate, p_phone: vinfo.phone }); } catch (e) {}
@@ -170,7 +186,7 @@
       else { U.toast("ماكو انترنت ولا نسخة محفوظة", "bad"); return false; }
     }
     if (r.status !== "ok") { if (!silent) U.toast("الرمز غلط", "bad"); U.store.del(SESS, sessionStorage); return false; }
-    pin = p; gate = g; setList(r.students);
+    pin = p; gate = g; setList(r.students); setExport(r.export);
     U.store.set(SESS, { pin, gate, v: vinfo }, sessionStorage); U.store.set("frq_last_pin", { h: await U.sha256(p) });
     registerVolunteer();
     $("#gateLbl").textContent = gate;
@@ -204,7 +220,7 @@
     try {
       const r = await API.rpc("scanner_list", { p_pin: pin });
       API.rpc("volunteer_ping", { p_pin: pin, p_device: DEVICE }).catch(() => {});
-      if (r.status === "ok") { setList(r.students); setOnline(true); if (!$("#tab-manual").hidden) renderManual(); }
+      if (r.status === "ok") { setList(r.students); setExport(r.export); setOnline(true); if (!$("#tab-manual").hidden) renderManual(); }
     } catch (e) { if (e instanceof U.NetError) setOnline(false); }
   }
   function updateCount() {
@@ -558,7 +574,8 @@
   const sv = U.store.get("frq_vinfo");
   if (sv) { $("#vName").value = sv.name || ""; $("#vGate").value = sv.gate || ""; $("#vPhone").value = sv.phone || ""; vinfo = sv; }
   if (s && s.pin) { $("#pin").value = s.pin; if (s.v) vinfo = s.v; login(s.pin, s.gate, true); }
-  updateCount();
+  updateCount(); setExport();
+  $("#exBtn").onclick = exportList;
 })();
 </script>
 </body>

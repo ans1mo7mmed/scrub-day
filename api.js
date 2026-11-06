@@ -42,7 +42,7 @@
   function load() {
     try { const s = localStorage.getItem(KEY); if (s) db = JSON.parse(s); } catch (e) {}
     if (!db) {
-      db = { seq: 0, lseq: 0, settings: { admin_pin: "1234", scanner_pin: "0000", tickets_open: "true" }, students: [], log: [] };
+      db = { seq: 0, lseq: 0, settings: { admin_pin: "1234", scanner_pin: "0000", tickets_open: "true", volunteer_export: "true" }, students: [], log: [] };
       SAMPLE.forEach(n => db.students.push(blank(n)));
       save();
     }
@@ -138,11 +138,11 @@
     scanner_list: async ({ p_pin }) => {
       if (!pin("scanner", p_pin)) return BAD;
       const rows = db.students.slice().sort(byName);
-      return { status: "ok", students: await Promise.all(rows.map(async s => ({ id: s.id, no: s.ticket_no, name: s.full_name, k: s.kind, h: s.token ? await sha256(s.token) : null, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null }))) };
+      return { status: "ok", export: db.settings.volunteer_export === "true", students: await Promise.all(rows.map(async s => ({ id: s.id, no: s.ticket_no, name: s.full_name, k: s.kind, h: s.token ? await sha256(s.token) : null, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null }))) };
     },
     admin_list: ({ p_pin }) => {
       if (!pin("admin", p_pin)) return BAD;
-      return { status: "ok", open: db.settings.tickets_open === "true", students: db.students.slice().sort((a, b) => a.ticket_no - b.ticket_no).map(s => ({ id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title, note: s.note, listed: s.listed, issued_at: s.issued_at, open_count: s.open_count, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null })) };
+      return { status: "ok", open: db.settings.tickets_open === "true", vexport: db.settings.volunteer_export === "true", students: db.students.slice().sort((a, b) => a.ticket_no - b.ticket_no).map(s => ({ id: s.id, no: s.ticket_no, name: s.full_name, kind: s.kind, title: s.title, note: s.note, listed: s.listed, issued_at: s.issued_at, open_count: s.open_count, at: s.checked_in_at, by: s.checked_in_by, ov: s.override_count, out: s.out_at || null })) };
     },
     admin_update: ({ p_pin, p_id, p_data: d }) => {
       if (!pin("admin", p_pin)) return BAD;
@@ -232,7 +232,7 @@
     },
     admin_set_setting: ({ p_pin, p_key, p_value }) => {
       if (!pin("admin", p_pin)) return BAD;
-      if (!["tickets_open", "scanner_pin", "admin_pin"].includes(p_key)) return { status: "bad_key" };
+      if (!["tickets_open", "scanner_pin", "admin_pin", "volunteer_export"].includes(p_key)) return { status: "bad_key" };
       if (p_key.endsWith("_pin") && String(p_value || "").length < 6) return { status: "short" };
       db.settings[p_key] = p_value; save(); return { status: "ok" };
     }
@@ -267,6 +267,57 @@
       if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
       t.textContent = msg; t.className = "show " + (kind || "");
       clearTimeout(t._h); t._h = setTimeout(() => (t.className = ""), 2800);
+    },
+    // كشف الحضور الاحتياطي — كل الأسماء مرتبة أبجدياً، يتحفظ PDF من نافذة الطباعة (نص عربي حقيقي وقابل للبحث)
+    gateList(win, rows, who) {
+      const E = (window.APP_CONFIG || {}).EVENT || {}, esc = U.esc;
+      const list = rows.slice().sort((a, b) => a.name.localeCompare(b.name, "ar"));
+      const first = n => (U.norm(n)[0] || "#");
+      let cur = "", i = 0, body = "";
+      list.forEach(r => {
+        const f = first(r.name);
+        if (f !== cur) { cur = f; body += `<tr class="grp"><td colspan="6">${esc(f)}</td></tr>`; }
+        const kind = r.kind && r.kind !== "regular" ? `<b class="k">${r.kind.toUpperCase()}</b>` : "طالب";
+        body += `<tr><td class="c">${++i}</td><td class="nm">${esc(r.name)}</td><td class="no">${U.no(r.no || r.id)}</td><td class="c">${kind}</td><td class="c">${r.issued ? "✓" : "—"}</td><td class="box"></td></tr>`;
+      });
+      const now = new Date().toLocaleString("ar-IQ", { day: "numeric", month: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+      win.document.open();
+      win.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>كشف الحضور — ${esc(E.title || "")}</title>
+<style>
+  @page { size: A4; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Tahoma, "Segoe UI", Arial, sans-serif; color: #000; margin: 0; padding: 14px; font-size: 13px; background: #fff; }
+  .bar { position: sticky; top: 0; background: #0f2150; color: #fff; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .bar button { background: #5b8cff; color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: bold; font-family: inherit; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .meta { font-size: 12px; color: #333; margin-bottom: 4px; line-height: 1.7; }
+  .warn { font-size: 11px; color: #a00; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #888; padding: 5px 6px; text-align: right; }
+  th { background: #e8edf8; font-size: 12px; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  tr.grp td { background: #f2f2f2; font-weight: bold; font-size: 14px; padding: 3px 8px; }
+  td.c { text-align: center; width: 48px; }
+  td.no { width: 70px; text-align: center; font-family: monospace; font-size: 14px; font-weight: bold; direction: ltr; }
+  td.nm { font-size: 14px; }
+  td.box { width: 46px; }
+  .k { font-size: 11px; }
+  .foot { margin-top: 10px; font-size: 10px; color: #666; text-align: center; }
+  @media print { .bar { display: none; } body { padding: 0; } }
+</style></head><body>
+<div class="bar"><span>اضغط الزر ← اختار <b>حفظ كـ PDF / Save as PDF</b> حتى ينحفظ بموبايلك ويفتح بدون انترنت</span><button onclick="print()">حفظ PDF / طباعة</button></div>
+<h1>كشف الحضور الاحتياطي — ${esc(E.title || "")} · ${esc(E.batch || "")}</h1>
+<div class="meta">${esc(E.university || "")} · ${esc(E.dateText || "")}${E.timeText ? " · " + esc(E.timeText) : ""} · ${esc(E.venue || "")}<br>
+عدد المشاركين: <b>${list.length}</b> · تاريخ التنزيل: ${now}${who ? " · نزّله: " + esc(who) : ""}</div>
+<div class="warn">سري — للمتطوعين فقط. يُستخدم إذا النظام ما اشتغل: طابق الاسم والرقم مع الهوية، وأشّر ✓ بخانة "دخل" حتى ما يدخل الشخص مرتين.</div>
+<table><thead><tr><th>#</th><th>الاسم الثلاثي</th><th>رقم التذكرة</th><th>النوع</th><th>طلّع تذكرة</th><th>دخل ✓</th></tr></thead>
+<tbody>${body || '<tr><td colspan="6" style="text-align:center">ماكو أسماء</td></tr>'}</tbody></table>
+<div class="foot">${esc(E.organizerLabel || "ORGANIZED BY")} ${esc(E.organizer || "")} · © 2026 تصميم وتطوير النظام: محمد أسعد السعد</div>
+<script>setTimeout(function(){ try { print(); } catch (e) {} }, 600);<\/script>
+</body></html>`);
+      win.document.close();
     },
     demoBanner() {
       if (LIVE) return;

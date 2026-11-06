@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=11">
+<link rel="stylesheet" href="app.css?v=12">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -31,7 +31,7 @@
     <div><h1 style="font-size:22px">لوحة الإدارة</h1><div class="muted small">حفلة السكراب · <span id="evLine"></span> · <span class="netdot on" id="net"></span> <span id="upd"></span></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn ghost sm" id="csvBtn">تصدير Excel</button>
-      <button class="btn ghost sm" id="printBtn">طباعة كشف احتياطي</button>
+      <button class="btn ghost sm" id="printBtn">كشف الحضور PDF</button>
       <button class="btn ghost sm" id="logout">خروج</button>
     </div>
   </div>
@@ -158,6 +158,12 @@
         <button class="switch" id="openSw" role="switch" aria-checked="true"><i></i></button>
       </div>
       <hr class="sep">
+      <h2>كشف الحضور للمتطوعين</h2>
+      <div class="switch-row">
+        <div><b id="vexLbl">مسدود</b><div class="muted small">إذا فعّلته، كل متطوع يكدر ينزّل من الماسح PDF بكل الأسماء وأرقام التذاكر (حل احتياطي إذا النظام ما اشتغل). فعّله بعد ما ترفعون الأسماء.</div></div>
+        <button class="switch" id="vexSw" role="switch" aria-checked="false"><i></i></button>
+      </div>
+      <hr class="sep">
       <h2>تغيير رمز المتطوعين (الماسح)</h2>
       <div class="row"><input class="input" id="newScan" placeholder="الرمز الجديد (6 أحرف أو أكثر)"><button class="btn sm" id="saveScan" style="flex:0 0 auto">حفظ</button></div>
       <p class="muted small">المتطوعين المسجلين حالياً راح يطلبهم الماسح يدخلون الرمز الجديد.</p>
@@ -224,15 +230,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js?v=11"></script>
-<script src="api.js?v=11"></script>
-<script src="ticket.js?v=11"></script>
+<script src="config.js?v=12"></script>
+<script src="api.js?v=12"></script>
+<script src="ticket.js?v=12"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
   U.demoBanner();
   const SESS = "frq_admin";
-  let pin = "", rows = [], logRows = [], filter = "all", logFilter = "all", isOpen = true, activeTab = "students";
+  let vexport = false, pin = "", rows = [], logRows = [], filter = "all", logFilter = "all", isOpen = true, activeTab = "students";
   $("#evLine").textContent = E.dateText + " · " + E.venue;
   const RES = { ok: ["دخل", "in"], manual: ["يدوي", "iss"], offline: ["أوفلاين", "iss"], used: ["مستخدمة مسبقاً", "bad"], invalid: ["غير صالحة", "out"], override: ["سماح استثنائي", "warn"], undo: ["إلغاء دخول", "out"], exit: ["خروج مؤقت", "outside"], reentry: ["رجوع", "in"], note: ["ملاحظة", "iss"], rejected: ["مرفوض بالتحقق", "bad"] };
 
@@ -243,7 +249,7 @@
   }
   async function load() {
     try {
-      const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false;
+      const r = await call("admin_list"); rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport;
       if (activeTab === "log" || activeTab === "stats") await loadLog();
       $("#net").className = "netdot on"; $("#upd").textContent = "آخر تحديث " + U.time(new Date().toISOString());
       render();
@@ -312,7 +318,7 @@
   };
 
   function enter(r) {
-    rows = r.students; isOpen = r.open !== false;
+    rows = r.students; isOpen = r.open !== false; vexport = !!r.vexport;
     $("#loginView").hidden = true; $("#adminView").hidden = false; render(); renderLinks();
     setInterval(() => { if (!document.hidden) load(); }, 12000);
     renderBackupInfo(); setTimeout(autoSnapshot, 3000); setInterval(autoSnapshot, 5 * 60000);
@@ -377,6 +383,7 @@
     const total = rows.length, issued = rows.filter(r => r.issued_at).length, inn = rows.filter(r => r.at).length, ov = rows.reduce((a, r) => a + (r.ov || 0), 0);
     $("#sTotal").textContent = total; $("#sIssued").textContent = issued; $("#sIn").textContent = inn; $("#sOv").textContent = ov;
     fillLogSid(); if ($("#bkLast")) renderBackupInfo();
+    $("#vexSw").setAttribute("aria-checked", vexport); $("#vexLbl").textContent = vexport ? "مفعّل — المتطوعين يكدرون ينزّلون الكشف" : "مسدود — المتطوعين ما يشوفون زر الكشف";
     $("#openSw").setAttribute("aria-checked", isOpen); $("#openLbl").textContent = isOpen ? "مفتوح — الطلاب يكدرون يطلّعون تذاكر" : "مسدود — ماكو إصدار تذاكر جديدة";
     if (document.querySelector(".menu .pop:not([hidden])")) return; // لا تعيد الرسم والقائمة مفتوحة
     const q = U.norm($("#q").value);
@@ -625,6 +632,12 @@
   }
 
   // ---------- settings ----------
+  $("#vexSw").onclick = async () => {
+    const v = !vexport;
+    if (v && !confirm("تفعيل تنزيل كشف الحضور للمتطوعين؟\nكل متطوع عنده الرمز يكدر ينزّل ملف بكل الأسماء وأرقام التذاكر.")) return;
+    await call("admin_set_setting", { p_key: "volunteer_export", p_value: String(v) });
+    vexport = v; render(); U.toast(v ? "تفعّل ✓" : "انسد", "ok");
+  };
   $("#openSw").onclick = async () => {
     const v = !isOpen;
     if (!v && !confirm("تسد إصدار التذاكر؟ الطلاب اللي ما طلّعوا تذكرة ما يكدرون بعد.")) return;
@@ -656,19 +669,9 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "حضور-حفلة-السكراب.csv"; a.click();
   };
   $("#printBtn").onclick = () => {
-    const list = rows.slice().sort((a, b) => a.name.localeCompare(b.name, "ar"));
     const w = window.open("", "_blank");
     if (!w) return U.toast("المتصفح منع النافذة", "bad");
-    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>كشف الحضور الاحتياطي</title>
-      <style>body{font-family:Tahoma,Arial,sans-serif;margin:24px;color:#000}h1{font-size:18px;margin:0}p{margin:4px 0 14px;font-size:12px}
-      table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}
-      td.c{width:70px;text-align:center}td.k{width:60px}</style></head><body>
-      <h1>كشف الحضور الاحتياطي — ${U.esc(E.title)} · ${U.esc(E.batch)}</h1>
-      <p>${U.esc(E.university)} · ${U.esc(E.dateText)} · ${U.esc(E.venue)} · تنظيم ${U.esc(E.organizer)} · العدد: ${list.length}</p>
-      <table><thead><tr><th>№</th><th>الاسم</th><th>دخل ✓</th><th>ملاحظة</th></tr></thead><tbody>
-      ${list.map(r => `<tr><td class="k">${U.no(r.no)}</td><td>${U.esc(r.name)}${r.kind !== "regular" ? " (" + r.kind.toUpperCase() + ")" : ""}</td><td class="c">${r.at ? "✓" : ""}</td><td></td></tr>`).join("")}
-      </tbody></table><script>onload=()=>print()<\/script></body></html>`);
-    w.document.close();
+    U.gateList(w, rows.map(r => ({ name: r.name, no: r.no, id: r.id, kind: r.kind, issued: !!r.issued_at })), "الإدارة");
   };
 
   const saved = U.store.get(SESS, sessionStorage);
