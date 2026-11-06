@@ -134,6 +134,7 @@
   let pin = "", gate = "", list = U.store.get(CACHE) || [], stream = null, track = null, scanning = false, busy = false;
   let lastCode = "", lastAt = 0, detector = null, current = null, online = true, recent = [];
   let queue = U.store.get(QUEUE) || [];
+  const hashCache = new Map();
 
   const ICONS = {
     ok: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
@@ -161,7 +162,7 @@
     $("#gateLbl").textContent = gate;
     $("#loginView").hidden = true; $("#scanView").hidden = false;
     setOnline(!r.cached); startCam(); keepAwake();
-    setInterval(refresh, 12000); setInterval(sync, 6000);
+    setInterval(() => { if (!busy && !document.hidden) refresh(); }, 30000); setInterval(sync, 6000);
     return true;
   }
   $("#loginForm").onsubmit = async e => {
@@ -290,6 +291,11 @@
     lastCode = code; lastAt = now; busy = true;
     if (!code.startsWith(E.qrPrefix)) return show({ status: "invalid" }, "كود مزور أو مو تابع لتذاكر الحفلة");
     const token = code.slice(E.qrPrefix.length);
+    // مسار سريع: إذا التذكرة موجودة بالنسخة المحلية وما داخلة، شاشة التحقق تطلع فوراً
+    const fast = list.find(x => x.h && x.h === hashCache.get(token)) || null;
+    const h = hashCache.get(token) || await U.sha256(token); hashCache.set(token, h);
+    const s0 = fast || list.find(x => x.h === h);
+    if (s0 && !s0.at) return askVerify({ status: "valid", id: s0.id, no: s0.no, kind: s0.k, name: s0.name, token });
     try {
       // فحص فقط — ما ينسجل دخول إلا بعد تأكيد الهوية
       const r = await API.rpc("peek_ticket", { p_token: token, p_pin: pin, p_gate: gate });
@@ -332,7 +338,7 @@
       if (!r.offline) {
         try {
           const x = await API.rpc("check_in", { p_token: r.token, p_pin: pin, p_gate: gate });
-          setOnline(true); show(x); refresh(); return;
+          setOnline(true); markLocal(r.id, x); show(x); return;
         } catch (e) { if (!(e instanceof U.NetError)) throw e; setOnline(false); }
       }
       const s = list.find(x => x.id === r.id);
@@ -373,7 +379,15 @@
     } catch (e) {}
     try { navigator.vibrate && navigator.vibrate(good ? 100 : [200, 80, 200]); } catch (e) {}
   }
+  let autoClose = null;
+  function markLocal(id, x) {
+    const s = list.find(y => y.id === id); if (!s) return;
+    if (!s.at) { s.at = (x && x.at) || new Date().toISOString(); s.by = (x && x.by) || gate; }
+    updateCount(); clearTimeout(markLocal.t); markLocal.t = setTimeout(() => U.store.set(CACHE, list), 800);
+  }
   function show(r, why, offline) {
+    clearTimeout(autoClose);
+    if (r.status === "ok") autoClose = setTimeout(() => { if (!$("#result").hidden && current === r) closeResult(); }, 1500);
     const st = ["ok", "used", "override", "rejected"].includes(r.status) ? r.status : "invalid";
     current = r;
     $("#result").className = "result " + st;
@@ -434,7 +448,7 @@
         r = { status: "override", id: ovTarget.id, no: ovTarget.no, name: ovTarget.name, offline: true };
       }
       $("#ovDlg").close();
-      busy = true; show(r, null, r.offline); refresh();
+      busy = true; markLocal(ovTarget.id, { at: new Date().toISOString(), by: gate }); show(r, null, r.offline);
       if (!$("#tab-manual").hidden) renderManual();
     } catch (e) { U.toast("صار خطأ", "bad"); }
     finally { b.disabled = false; }
@@ -466,7 +480,7 @@
         s.at = new Date().toISOString(); s.by = gate + " (يدوي، أوفلاين)"; U.store.set(CACHE, list); updateCount();
         r = { status: "ok", id: s.id, no: s.no, kind: s.k, name: s.name, offline: true };
       }
-      busy = true; show(r, null, r.offline); await refresh(); renderManual();
+      busy = true; markLocal(s.id, r); show(r, null, r.offline); renderManual();
     } catch (err) { U.toast("صار خطأ", "bad"); b.disabled = false; }
   });
 

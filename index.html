@@ -110,7 +110,8 @@
 
   function renderList() {
     const q = U.norm($("#q").value);
-    const rows = q ? students.filter(s => s._n.includes(q)) : students;
+    if (students.length && q.length < 2) { $("#list").innerHTML = '<li class="empty">اكتب أول حرفين من اسمك حتى يطلع</li>'; return; }
+    const rows = students.filter(s => s._n.includes(q)).slice(0, 40);
     if (!students.length) { $("#list").innerHTML = '<li class="empty">القائمة فارغة حالياً</li>'; return; }
     if (!rows.length) { $("#list").innerHTML = '<li class="empty">ما لكينا هذا الاسم. جرّب تكتب الاسم الأول بس.</li>'; return; }
     $("#list").innerHTML = rows.map(s =>

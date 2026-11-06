@@ -225,7 +225,7 @@
   function enter(r) {
     rows = r.students; isOpen = r.open !== false;
     $("#loginView").hidden = true; $("#adminView").hidden = false; render(); renderLinks();
-    setInterval(load, 8000);
+    setInterval(() => { if (!document.hidden) load(); }, 12000);
   }
   $("#logout").onclick = () => { U.store.del(SESS, sessionStorage); location.reload(); };
 
