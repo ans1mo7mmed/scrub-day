@@ -185,6 +185,8 @@ dialog p { margin: 6px 0 18px; color: var(--muted); font-size: 14px; }
 .countdown div { min-width: 70px; padding: 8px 10px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); }
 .countdown b { display: block; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .countdown span { font-size: 12px; color: var(--muted); }
+.count-line { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 14px; padding: 10px; border-radius: 14px; background: rgba(91, 140, 255, .08); border: 1px solid var(--line); }
+.count-line b { color: var(--ice); font-size: 18px; margin-inline-end: 4px; }
 .closed-note { background: rgba(245, 158, 11, .14); border: 1px solid rgba(245, 158, 11, .4); color: #fde68a; border-radius: 14px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
 .org-line { direction: ltr; margin-top: 14px; font-size: 12px; letter-spacing: .25em; color: var(--muted); }
 .org-line b { color: var(--gold); letter-spacing: .2em; }

@@ -64,10 +64,10 @@
           <input class="input" name="name" placeholder="الاسم الكامل" required minlength="3">
           <select class="input" name="kind"><option value="vip">VIP · شخصيات مهمة</option><option value="vvip">VVIP · دعوة خاصة</option><option value="regular">عادية</option></select>
           <input class="input" name="title" placeholder="الصفة (اختياري) — مثلاً: عميد الكلية">
-          <label class="check"><input type="checkbox" name="listed"> يظهر بقائمة موقع الطلاب</label>
+          <label class="check"><input type="checkbox" name="listed"> يكدر يطلّعها بنفسه من موقع الطلاب</label>
           <button class="btn" type="submit" style="width:100%">إصدار التذكرة</button>
         </form>
-        <p class="muted small" style="margin:8px 0 0">الدعوة تطلع فوراً وتكدر تحمّلها وترسلها للشخص. ما تظهر بقائمة الطلاب إلا إذا فعّلت الخيار.</p>
+        <p class="muted small" style="margin:8px 0 0">الدعوة تطلع فوراً وتكدر تحمّلها وترسلها للشخص. وما ينكدر يطلّعها أحد من موقع الطلاب إلا إذا فعّلت الخيار.</p>
       </section>
       <section class="card">
         <h2>الروابط</h2>
@@ -88,7 +88,7 @@
         <button data-f="out">ما دخلوا</button>
         <button data-f="ov">استثناءات</button>
         <button data-f="vip">VIP / VVIP</button>
-        <button data-f="hidden">مخفيين من القائمة</button>
+        <button data-f="hidden">بدون إصدار ذاتي</button>
       </div>
       <table>
         <thead><tr><th>№</th><th>الاسم</th><th>التذكرة</th><th>الدخول</th><th></th></tr></thead>
@@ -167,7 +167,7 @@
       </div>
       <label>الصفة (تظهر على التذكرة — اختياري)<input class="input" name="title" placeholder="مثلاً: عميد الكلية، ضيف شرف"></label>
       <label>ملاحظة داخلية (ما تظهر للطالب)<input class="input" name="note"></label>
-      <label class="check"><input type="checkbox" name="listed"> يظهر بقائمة موقع الطلاب (يكدر يطلّع تذكرته بنفسه)</label>
+      <label class="check"><input type="checkbox" name="listed"> يكدر يطلّع تذكرته بنفسه من موقع الطلاب (بكتابة اسمه الثلاثي)</label>
       <div class="row" style="margin-top:6px"><button type="button" class="btn ghost" data-close>إلغاء</button><button class="btn" type="submit">حفظ</button></div>
     </form>
   </div>

@@ -26,13 +26,14 @@
   </header>
 
   <section class="card">
-    <div class="closed-note" id="closedNote" hidden>إصدار التذاكر الجديدة مسدود حالياً. إذا طلّعت تذكرتك قبل، اختار اسمك وتطلع لك نفسها.</div>
-    <label class="label" for="q">دوّر على اسمك واختاره</label>
-    <div class="search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="q" class="input" placeholder="اكتب اسمك…" autocomplete="off" enterkeyhint="search">
-    </div>
-    <ul class="names" id="list"><li class="empty"><span class="spinner"></span></li></ul>
+    <div class="closed-note" id="closedNote" hidden>إصدار التذاكر الجديدة مسدود حالياً. إذا طلّعت تذكرتك قبل، اكتب اسمك الثلاثي وتطلع لك نفسها.</div>
+    <div class="count-line" id="countLine"><span class="spinner"></span></div>
+    <form id="findForm" autocomplete="off">
+      <label class="label" for="q">اكتب اسمك الثلاثي كامل</label>
+      <input id="q" class="input" placeholder="مثلاً: حسين عبد الجليل كاظم" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" required>
+      <p class="muted small" style="margin:8px 0 12px">اكتبه مثل ما مسجل عند ممثل الدفعة. التذكرة تطلع بس لصاحب الاسم، وأسماء المشاركين ما تنعرض لأحد.</p>
+      <button class="btn" id="findBtn" type="submit" style="width:100%">إظهار تذكرتي</button>
+    </form>
     <p class="muted small" style="text-align:center;margin:14px 0 0">اسمك مو موجود؟ راجع ممثل الدفعة <b id="repName"></b></p>
   </section>
 </main>
@@ -50,20 +51,9 @@
     </button>
   </div>
   <p class="hint">تكدر تسوي سكرين شوت هم. التذكرة تنمسح <b>مرة وحدة بس</b> بالبوابة، فلا تنطيها لأحد — واجلب هويتك الجامعية وياك.</p>
-  <button class="linkbtn" id="backBtn">مو اسمك؟ رجوع للقائمة</button>
+  <button class="linkbtn" id="backBtn">مو اسمك؟ رجوع</button>
 </main>
 
-<dialog id="confirm">
-  <div class="card">
-    <div class="av" style="margin:0 auto;width:56px;height:56px;border-radius:18px;font-size:22px" id="cAv"></div>
-    <h3 id="cName"></h3>
-    <p>تأكد إن هذا اسمك. التذكرة شخصية، وعند الدخول راح يتطابق الاسم مع هويتك الجامعية.</p>
-    <div class="row">
-      <button class="btn ghost" id="cNo">لا، رجوع</button>
-      <button class="btn" id="cYes">إي، هذا اسمي</button>
-    </div>
-  </div>
-</dialog>
 
 <canvas id="confetti"></canvas>
 
@@ -105,53 +95,37 @@
     draw(); setInterval(draw, 30000);
   })();
 
-  let students = [], picked = null, current = null;
+  let current = null;
   const SAVE_KEY = "frq_my_ticket";
+  const MSG = {
+    need_full: "اكتب اسمك الثلاثي كامل (ثلاث أسماء على الأقل)",
+    not_found: "ما لكينا هذا الاسم. تأكد من كتابة اسمك الثلاثي مثل ما مسجل، وإذا المشكلة بقت راجع ممثل الدفعة",
+    ambiguous: "أكو أكثر من شخص بنفس الاسم الثلاثي — اكتب اسمك الرباعي",
+    closed: "إصدار التذاكر مسدود حالياً — راجع ممثل الدفعة"
+  };
 
-  function renderList() {
-    const q = U.norm($("#q").value);
-    if (students.length && q.length < 2) { $("#list").innerHTML = '<li class="empty">اكتب أول حرفين من اسمك حتى يطلع</li>'; return; }
-    const rows = students.filter(s => s._n.includes(q)).slice(0, 40);
-    if (!students.length) { $("#list").innerHTML = '<li class="empty">القائمة فارغة حالياً</li>'; return; }
-    if (!rows.length) { $("#list").innerHTML = '<li class="empty">ما لكينا هذا الاسم. جرّب تكتب الاسم الأول بس.</li>'; return; }
-    $("#list").innerHTML = rows.map(s =>
-      `<li><button data-id="${s.id}"><span class="av">${U.esc(s.name.trim()[0] || "؟")}</span><span class="nm">${U.esc(s.name)}</span>` +
-      `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></li>`).join("");
-  }
-
-  async function loadList() {
+  async function loadCount() {
     try {
       const r = await API.rpc("list_students");
-      students = (r.students || []).map(s => ({ ...s, _n: U.norm(s.name) }));
       $("#closedNote").hidden = r.open !== false;
-      renderList();
-    } catch (e) {
-      $("#list").innerHTML = '<li class="empty">صار خطأ بالاتصال. تأكد من الانترنت وحدّث الصفحة.</li>';
-    }
+      $("#countLine").innerHTML = '<b>' + (r.count || 0) + '</b> مشارك مسجّل بالحفلة';
+    } catch (e) { $("#countLine").textContent = ""; }
   }
 
-  $("#q").addEventListener("input", renderList);
-  $("#list").addEventListener("click", e => {
-    const b = e.target.closest("button[data-id]"); if (!b) return;
-    picked = students.find(s => s.id === +b.dataset.id);
-    $("#cName").textContent = picked.name;
-    $("#cAv").textContent = picked.name.trim()[0];
-    $("#confirm").showModal();
-  });
-  $("#cNo").onclick = () => $("#confirm").close();
-  $("#cYes").onclick = async () => {
-    const btn = $("#cYes"); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  $("#findForm").onsubmit = async e => {
+    e.preventDefault();
+    const name = $("#q").value.trim();
+    if (U.norm(name).split(" ").length < 3) return U.toast(MSG.need_full, "bad");
+    const btn = $("#findBtn"); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     askMotion();
     try {
-      const r = await API.rpc("issue_ticket", { p_id: picked.id });
-      if (r.status === "closed") { $("#confirm").close(); return U.toast("إصدار التذاكر مسدود حالياً — راجع ممثل الدفعة", "bad"); }
-      if (r.status !== "ok") throw new Error(r.status);
-      $("#confirm").close();
-      U.store.set(SAVE_KEY, { id: r.id, name: r.name, token: r.token });
+      const r = await API.rpc("find_ticket", { p_name: name });
+      if (r.status !== "ok") return U.toast(MSG[r.status] || "ما گدرنا نطلّع التذكرة", "bad");
+      U.store.set(SAVE_KEY, { id: r.id, no: r.no, name: r.name, kind: r.kind, title: r.title, token: r.token });
       showTicket(r, true);
-    } catch (e) {
-      U.toast("ما گدرنا نطلّع التذكرة، حاول مرة ثانية", "bad");
-    } finally { btn.disabled = false; btn.textContent = "إي، هذا اسمي"; }
+    } catch (err) {
+      U.toast("مشكلة بالاتصال، حاول مرة ثانية", "bad");
+    } finally { btn.disabled = false; btn.textContent = "إظهار تذكرتي"; }
   };
 
   function showTicket(t, celebrate) {
@@ -165,7 +139,7 @@
 
   $("#backBtn").onclick = () => {
     U.store.del(SAVE_KEY); current = null;
-    $("#ticketView").hidden = true; $("#pickView").hidden = false; $("#q").value = ""; renderList();
+    $("#ticketView").hidden = true; $("#pickView").hidden = false; $("#q").value = "";
   };
 
   async function exportWith(fn, btn) {
@@ -239,11 +213,11 @@
       showTicket(saved, false);
       try {
         const r = await API.rpc("get_ticket", { p_token: saved.token });
-        if (r.status === "ok") { if (r.name !== saved.name) { U.store.set(SAVE_KEY, r); showTicket(r, false); } }
+        if (r.status === "ok") { U.store.set(SAVE_KEY, r); if (r.name !== saved.name || r.no !== saved.no || r.kind !== saved.kind) showTicket(r, false); }
         else { U.store.del(SAVE_KEY); $("#backBtn").click(); U.toast("تذكرتك القديمة انلغت، اختار اسمك مرة ثانية"); }
       } catch (e) { /* بدون انترنت: نخلي التذكرة المحفوظة */ }
     }
-    loadList();
+    loadCount();
   })();
 })();
 </script>

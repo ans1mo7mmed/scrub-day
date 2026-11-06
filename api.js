@@ -68,7 +68,18 @@
   const BAD = { status: "bad_pin" };
 
   const Mock = {
-    list_students: () => ({ open: load().settings.tickets_open === "true", students: db.students.filter(s => s.listed).sort(byName).map(s => ({ id: s.id, name: s.full_name })) }),
+    list_students: () => ({ open: load().settings.tickets_open === "true", count: db.students.filter(s => s.listed).length }),
+    find_ticket: ({ p_name }) => {
+      load(); const q = U.norm(p_name).replace(/[%_\\]/g, "");
+      if (q.split(" ").length < 3 || q.length < 8) return { status: "need_full" };
+      const pool = db.students.filter(s => s.listed);
+      let s = pool.find(x => U.norm(x.full_name) === q);
+      if (!s) { const m = pool.filter(x => U.norm(x.full_name).startsWith(q + " ")); if (m.length > 1) return { status: "ambiguous" }; s = m[0]; }
+      if (!s) return { status: "not_found" };
+      if (!s.token && db.settings.tickets_open !== "true") return { status: "closed" };
+      if (!s.token) { s.token = tok(); s.issued_at = now(); }
+      s.open_count++; save(); return tj(s);
+    },
     issue_ticket: ({ p_id }) => {
       const s = (load(), find(p_id)); if (!s || !s.listed) return { status: "not_found" };
       if (!s.token && db.settings.tickets_open !== "true") return { status: "closed" };
@@ -206,7 +217,7 @@
     norm: s => String(s || "")
       .replace(/[ً-ٰٟـ]/g, "")
       .replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي")
-      .replace(/\s+/g, " ").trim().toLowerCase(),
+      .replace(/عبد\s+/g, "عبد").replace(/\s+/g, " ").trim().toLowerCase(),
     no: id => String(id).padStart(4, "0"),
     time: iso => iso ? new Date(iso).toLocaleTimeString("ar-IQ", { hour: "numeric", minute: "2-digit" }) : "",
     dateTime: iso => iso ? new Date(iso).toLocaleString("ar-IQ", { day: "numeric", month: "numeric", hour: "numeric", minute: "2-digit" }) : "",
