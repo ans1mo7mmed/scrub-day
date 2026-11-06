@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=10">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -116,6 +116,11 @@
       <div id="gateBars"></div>
       <p class="muted small" style="margin:10px 0 0">"مشاكل" = تذاكر مقروءة مسبقاً + غير صالحة + مرفوضة بالتحقق. البوابة اللي معدلها أعلى وطابورها أطول تحتاج متطوع إضافي.</p>
     </section>
+    <section class="card chart-card">
+      <h2>👥 المتطوعين</h2>
+      <div id="volList"></div>
+      <p class="muted small" style="margin:10px 0 0">🟢 شغال هسه (آخر نشاط خلال دقيقتين) · ⚪ ما شغال. اضغط على الرقم حتى تتصل.</p>
+    </section>
     <div class="chart-tip" id="chartTip" hidden></div>
   </section>
 
@@ -219,9 +224,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="config.js?v=10"></script>
-<script src="api.js?v=10"></script>
-<script src="ticket.js?v=10"></script>
+<script src="config.js?v=11"></script>
+<script src="api.js?v=11"></script>
+<script src="ticket.js?v=11"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -244,7 +249,7 @@
       render();
     } catch (e) { $("#net").className = "netdot off"; }
   }
-  async function loadLog() { const r = await call("admin_log", { p_limit: 2000 }); logRows = r.log; renderLog(); if (activeTab === "stats") renderStats(); }
+  async function loadLog() { const r = await call("admin_log", { p_limit: 2000 }); logRows = r.log; renderLog(); if (activeTab === "stats") { renderStats(); loadVolunteers(); } }
 
   $("#loginForm").onsubmit = async e => {
     e.preventDefault();
@@ -574,6 +579,34 @@
     box.addEventListener("mousemove", showTip); box.addEventListener("touchstart", showTip, { passive: true });
     box.addEventListener("mouseleave", () => tip.hidden = true);
   })();
+
+  // ---------- المتطوعين ----------
+  let vols = [], volNow = Date.now();
+  async function loadVolunteers() {
+    try { const r = await call("admin_volunteers"); if (r.status === "ok") { vols = r.volunteers; volNow = new Date(r.now).getTime(); renderVolunteers(); } } catch (e) {}
+  }
+  const waNum = p => { let d = String(p).replace(/\D/g, ""); if (d.startsWith("00")) d = d.slice(2); if (d.startsWith("0")) d = "964" + d.slice(1); return d; };
+  function renderVolunteers() {
+    const counts = new Map();
+    logRows.forEach(l => { if (!ADMIT.has(l.result)) return; const g = gateName(l.gate); counts.set(g, (counts.get(g) || 0) + 1); });
+    $("#volList").innerHTML = vols.length ? vols.map(v => {
+      const on = volNow - new Date(v.last_seen).getTime() < 120000;
+      const n = counts.get(v.name + " – " + v.gate) || 0;
+      return `<div class="vol-row">
+        <span class="vdot ${on ? "on" : ""}" title="${on ? "شغال" : "ما شغال"}"></span>
+        <div class="vol-info"><b>${U.esc(v.name)}</b><small>${U.esc(v.gate)} · ${n} دخول · آخر نشاط ${U.time(v.last_seen)}</small></div>
+        <a class="vol-phone" href="tel:${U.esc(v.phone)}" dir="ltr">${U.esc(v.phone)}</a>
+        <a class="btn sm vol-call" href="tel:${U.esc(v.phone)}" aria-label="اتصال">📞</a>
+        <a class="btn sm ghost vol-wa" href="https://wa.me/${waNum(v.phone)}" target="_blank" rel="noopener" aria-label="واتساب">💬</a>
+        <button class="logrow-del" data-vdel="${U.esc(v.device)}" aria-label="حذف">×</button>
+      </div>`;
+    }).join("") : '<div class="empty">ماكو متطوعين مسجلين بعد — يظهرون هنا من يدخلون الماسح</div>';
+  }
+  $("#volList").addEventListener("click", async e => {
+    const b = e.target.closest("[data-vdel]"); if (!b) return;
+    if (!confirm("حذف هذا المتطوع من القائمة؟ (إذا رجع دخل للماسح يرجع يظهر)")) return;
+    await call("admin_volunteer_delete", { p_device: b.dataset.vdel }); loadVolunteers();
+  });
 
   // ---------- log ----------
   $("#logFilters").addEventListener("click", e => {

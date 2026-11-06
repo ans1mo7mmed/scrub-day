@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap">
-<link rel="stylesheet" href="app.css?v=10">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 <div class="bg-fx"></div>
@@ -21,7 +21,10 @@
     <p class="muted small">للمتطوعين فقط · حفلة السكراب · BASRA KING</p>
     <form id="loginForm">
       <input class="input" id="pin" type="password" placeholder="رمز المتطوعين" autocomplete="current-password" required>
-      <input class="input" id="gate" placeholder="اسمك + البوابة (مثلاً: علي – البوابة 1)" required maxlength="60">
+      <input class="input" id="vName" placeholder="اسمك (مثلاً: علي حسين)" required minlength="2" maxlength="40" autocomplete="name">
+      <input class="input" id="vGate" placeholder="البوابة (مثلاً: البوابة 1)" required maxlength="30">
+      <input class="input" id="vPhone" type="tel" inputmode="tel" placeholder="رقم موبايلك (07xxxxxxxxx)" required maxlength="16" autocomplete="tel" dir="ltr" style="text-align:right">
+      <p class="muted small" style="margin:0">رقمك يظهر بس لممثل الدفعة حتى يتصل بيك إذا احتاج.</p>
       <button class="btn" type="submit">دخول وتشغيل الكاميرا</button>
     </form>
   </div>
@@ -126,8 +129,8 @@
 
 <canvas id="cv" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="config.js?v=10"></script>
-<script src="api.js?v=10"></script>
+<script src="config.js?v=11"></script>
+<script src="api.js?v=11"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s), E = APP_CONFIG.EVENT;
@@ -136,6 +139,13 @@
   let pin = "", gate = "", list = U.store.get(CACHE) || [], stream = null, track = null, scanning = false, busy = false;
   let lastCode = "", lastAt = 0, detector = null, current = null, online = true, recent = [];
   let queue = U.store.get(QUEUE) || [];
+  // تعريف المتطوع: معرف ثابت لهذا الجهاز + الاسم والبوابة والرقم
+  let vinfo = null;
+  const DEVICE = U.store.get("frq_device") || (() => { const d = Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, "0")).join(""); U.store.set("frq_device", d); return d; })();
+  async function registerVolunteer() {
+    if (!vinfo) return;
+    try { await API.rpc("volunteer_checkin", { p_pin: pin, p_device: DEVICE, p_name: vinfo.name, p_gate: vinfo.gate, p_phone: vinfo.phone }); } catch (e) {}
+  }
   const hashCache = new Map();
 
   const ICONS = {
@@ -161,7 +171,8 @@
     }
     if (r.status !== "ok") { if (!silent) U.toast("الرمز غلط", "bad"); U.store.del(SESS, sessionStorage); return false; }
     pin = p; gate = g; setList(r.students);
-    U.store.set(SESS, { pin, gate }, sessionStorage); U.store.set("frq_last_pin", { h: await U.sha256(p) });
+    U.store.set(SESS, { pin, gate, v: vinfo }, sessionStorage); U.store.set("frq_last_pin", { h: await U.sha256(p) });
+    registerVolunteer();
     $("#gateLbl").textContent = gate;
     $("#loginView").hidden = true; $("#scanView").hidden = false;
     setOnline(!r.cached); startCam(); keepAwake();
@@ -171,7 +182,10 @@
   $("#loginForm").onsubmit = async e => {
     e.preventDefault();
     const b = e.target.querySelector("button"); b.disabled = true;
-    try { await login($("#pin").value.trim(), $("#gate").value.trim()); }
+    const name = $("#vName").value.trim(), gt = $("#vGate").value.trim(), phone = $("#vPhone").value.replace(/[^0-9+]/g, "");
+    if (phone.replace(/\D/g, "").length < 10) { b.disabled = false; return U.toast("اكتب رقم موبايل صحيح", "bad"); }
+    vinfo = { name, gate: gt, phone }; U.store.set("frq_vinfo", vinfo);
+    try { await login($("#pin").value.trim(), name + " – " + gt); }
     finally { b.disabled = false; }
   };
   $("#logout").onclick = () => {
@@ -189,6 +203,7 @@
   async function refresh() {
     try {
       const r = await API.rpc("scanner_list", { p_pin: pin });
+      API.rpc("volunteer_ping", { p_pin: pin, p_device: DEVICE }).catch(() => {});
       if (r.status === "ok") { setList(r.students); setOnline(true); if (!$("#tab-manual").hidden) renderManual(); }
     } catch (e) { if (e instanceof U.NetError) setOnline(false); }
   }
@@ -540,9 +555,9 @@
 
   // ---------- resume ----------
   const s = U.store.get(SESS, sessionStorage);
-  if (s && s.pin) { $("#pin").value = s.pin; $("#gate").value = s.gate || ""; login(s.pin, s.gate, true); }
-  else { const g = U.store.get("frq_gate"); if (g) $("#gate").value = g; }
-  $("#gate").addEventListener("change", e => U.store.set("frq_gate", e.target.value));
+  const sv = U.store.get("frq_vinfo");
+  if (sv) { $("#vName").value = sv.name || ""; $("#vGate").value = sv.gate || ""; $("#vPhone").value = sv.phone || ""; vinfo = sv; }
+  if (s && s.pin) { $("#pin").value = s.pin; if (s.v) vinfo = s.v; login(s.pin, s.gate, true); }
   updateCount();
 })();
 </script>

@@ -171,6 +171,15 @@
     admin_log_delete: ({ p_pin, p_log_id }) => { if (!pin("admin", p_pin)) return BAD; db.log = db.log.filter(l => l.id !== p_log_id); save(); return { status: "ok" }; },
     admin_log_clear: ({ p_pin }) => { if (!pin("admin", p_pin)) return BAD; db.log = []; save(); return { status: "ok" }; },
     admin_log_add: ({ p_pin, p_sid, p_result, p_reason }) => { if (!pin("admin", p_pin)) return BAD; log(find(p_sid) || null, p_result, "الإدارة", (p_reason || "").trim() || null); save(); return { status: "ok" }; },
+    volunteer_checkin: ({ p_pin, p_device, p_name, p_gate, p_phone }) => {
+      if (!pin("scanner", p_pin)) return BAD;
+      db.vols = db.vols || {}; const t = now();
+      db.vols[p_device] = { device: p_device, name: p_name, gate: p_gate, phone: p_phone, first_seen: (db.vols[p_device] || {}).first_seen || t, last_seen: t };
+      save(); return { status: "ok" };
+    },
+    volunteer_ping: ({ p_pin, p_device }) => { if (!pin("scanner", p_pin)) return BAD; if (db.vols && db.vols[p_device]) { db.vols[p_device].last_seen = now(); save(); } return { status: "ok" }; },
+    admin_volunteers: ({ p_pin }) => { if (!pin("admin", p_pin)) return BAD; return { status: "ok", now: now(), volunteers: Object.values(db.vols || {}) }; },
+    admin_volunteer_delete: ({ p_pin, p_device }) => { if (!pin("admin", p_pin)) return BAD; if (db.vols) delete db.vols[p_device]; save(); return { status: "ok" }; },
     admin_export: ({ p_pin }) => {
       if (!pin("admin", p_pin)) return BAD;
       return { status: "ok", app: "scrub-day", version: 1, exported_at: now(), tickets_open: db.settings.tickets_open, students: db.students, log: db.log };
