@@ -81,7 +81,7 @@
       if (q.split(" ").length < 2 || q.length < 5) return { status: "need_full" };
       const pool = db.students.filter(s => s.listed);
       let s = pool.find(x => U.norm(x.full_name) === q);
-      if (!s && q.split(" ").length >= 3) { const m = pool.filter(x => U.norm(x.full_name).startsWith(q + " ")); if (m.length > 1) return { status: "ambiguous" }; s = m[0]; }
+      if (!s) { const m = pool.filter(x => U.norm(x.full_name).startsWith(q + " ")); if (m.length > 1) return { status: "ambiguous" }; s = m[0]; }
       if (!s) return { status: "not_found" };
       if (!s.token && db.settings.tickets_open !== "true") return { status: "closed" };
       if (!s.token) { s.token = tok(); s.issued_at = now(); }
