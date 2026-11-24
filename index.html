@@ -156,7 +156,7 @@
   let current = null;
   const SAVE_KEY = "frq_my_ticket";
   const MSG = {
-    need_full: "اكتب اسمك الثلاثي كامل (ثلاث أسماء على الأقل)",
+    need_full: "اكتب اسمك كامل مثل ما مسجل عند ممثل الدفعة",
     not_found: "ما لكينا هذا الاسم. تأكد من كتابة اسمك الثلاثي مثل ما مسجل، وإذا المشكلة بقت راجع ممثل الدفعة",
     ambiguous: "الاسم قريب من أكثر من طالب — تأكد من كتابة اسمك الثلاثي بالضبط حرف بحرف",
     closed: "إصدار التذاكر مسدود حالياً — راجع ممثل الدفعة"
@@ -178,7 +178,7 @@
   $("#findForm").onsubmit = async e => {
     e.preventDefault();
     const name = $("#q").value.trim();
-    if (U.norm(name).split(" ").length < 3) return U.toast(MSG.need_full, "bad");
+    if (U.norm(name).split(" ").length < 2) return U.toast(MSG.need_full, "bad");
     const btn = $("#findBtn"); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     askMotion();
     try {
