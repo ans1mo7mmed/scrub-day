@@ -1,8 +1,9 @@
-# يمنع Supabase من إيقاف الداتابيس بسبب عدم النشاط (يرسل طلب قراءة كل يومين)
+# يمنع Supabase من إيقاف الداتابيس بسبب عدم النشاط (يرسل طلب قراءة مرتين يومياً)
+# إذا السيرفر ما رد بـ 200 الـ job يفشل ويوصلك إيميل من GitHub — يعني لازم تفتح Supabase وتسوي Resume
 name: keep-supabase-alive
 on:
   schedule:
-    - cron: "17 6 */2 * *"
+    - cron: "17 6,18 * * *"
   workflow_dispatch:
 jobs:
   ping:
@@ -10,7 +11,7 @@ jobs:
     steps:
       - name: Ping Supabase
         run: |
-          curl -sS -o /dev/null -w "%{http_code}\n" -X POST \
+          curl -sS --fail --retry 3 --retry-delay 20 -o /dev/null -w "%{http_code}\n" -X POST \
             "https://giskxbbjhcqlmdgjgyml.supabase.co/rest/v1/rpc/list_students" \
             -H "apikey: sb_publishable_t_Lh384XOBiuWXMWj91Olw_r-DOzzVc" \
             -H "Content-Type: application/json" -d '{}'
